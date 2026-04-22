@@ -4,10 +4,12 @@ import type { LocationUpdate } from '../location/LocationTracker';
 export class LocationLayer {
   private dot: L.CircleMarker | null = null;
   private ring: L.Circle | null = null;
+  lastLatLon: [number, number] | undefined;
 
   constructor(private map: L.Map) {}
 
   update(u: LocationUpdate): void {
+    this.lastLatLon = [u.lat, u.lon];
     const latlng: L.LatLngExpression = [u.lat, u.lon];
     if (!this.dot) {
       this.dot = L.circleMarker(latlng, {

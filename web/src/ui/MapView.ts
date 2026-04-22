@@ -49,7 +49,7 @@ export class MapView {
     if (isAxisAligned) {
       L.imageOverlay(this.imageUrl, bounds, { opacity: 0.75 }).addTo(this.map);
     } else {
-      new RotatedImageLayer(this.imageUrl, conv, w, h).addTo(this.map);
+      (new RotatedImageLayer(this.imageUrl, conv, w, h) as unknown as L.Layer).addTo(this.map);
     }
 
     this.map.fitBounds(bounds, { padding: [20, 20] });
@@ -73,13 +73,29 @@ export class MapView {
     const locateBtn = document.createElement('button');
     locateBtn.textContent = '⊙ Locate me';
     locateBtn.style.cssText = 'position:fixed;bottom:2rem;right:1rem;z-index:1000;padding:.75rem 1rem;font-size:1rem;';
+
+    let hasFirstFix = false;
+
     locateBtn.addEventListener('click', () => {
+      if (this.tracker['watchId'] !== null) {
+        // Already tracking — re-center on latest known position
+        if (this.locationLayer) {
+          const pos = (this.locationLayer as LocationLayer & { lastLatLon?: [number,number] }).lastLatLon;
+          if (pos && this.map) this.map.flyTo(pos, Math.max(this.map.getZoom(), 15));
+        }
+        return;
+      }
       locateBtn.disabled = true;
-      locateBtn.textContent = 'Searching…';
+      locateBtn.textContent = '⊙ Searching…';
       this.tracker.start(
         u => {
-          locateBtn.textContent = '⊙ Locating';
           this.locationLayer!.update(u);
+          if (!hasFirstFix) {
+            hasFirstFix = true;
+            this.map?.flyTo([u.lat, u.lon], 15);
+            locateBtn.disabled = false;
+            locateBtn.textContent = '⊙ Re-center';
+          }
         },
         err => {
           locateBtn.disabled = false;
@@ -114,6 +130,7 @@ function isApproximatelyAxisAligned(corners: [number,number][], _w: number, _h: 
 // Custom Leaflet layer for rotated/skewed image overlay using CSS transform.
 class RotatedImageLayer extends L.Layer {
   private img: HTMLImageElement | null = null;
+  private leafletMap: L.Map | null = null;
 
   constructor(
     private url: string,
@@ -123,6 +140,7 @@ class RotatedImageLayer extends L.Layer {
   ) { super(); }
 
   onAdd(map: L.Map): this {
+    this.leafletMap = map;
     const pane = map.getPane('overlayPane')!;
     this.img = document.createElement('img');
     this.img.src = this.url;
@@ -137,13 +155,14 @@ class RotatedImageLayer extends L.Layer {
   onRemove(map: L.Map): this {
     this.img?.remove();
     this.img = null;
+    this.leafletMap = null;
     map.off('viewreset move zoom', this.reposition, this);
     return this;
   }
 
   private reposition(): void {
-    if (!this.img || !this._map) return;
-    const map = this._map;
+    if (!this.img || !this.leafletMap) return;
+    const map = this.leafletMap;
     const w = this.w, h = this.h;
 
     // Map image corners to container pixels
