@@ -2,8 +2,9 @@
 
 ## What This Is
 
-A browser PWA that lets users georeference any raster image and use it as a live GPS map, with
-OpenStreetMap as the basemap and the browser Geolocation API for position tracking.
+A **local-first, open source** browser PWA that lets users georeference any raster image and use
+it as a live GPS map, with OpenStreetMap as the basemap and the browser Geolocation API for
+position tracking. No server, no account, no analytics. Mobile-first UI styled with Pico.css.
 
 Full product requirements are in `PRD.md`. Read it first.
 
@@ -176,12 +177,36 @@ web/src/storage/
 ## Key Decisions
 
 - **Leaflet.js** for the OSM map — lightweight, no API key, broad plugin ecosystem.
+- **Pico.css** for all UI chrome — classless, semantic HTML; no component framework needed.
 - **JSZip** for KMZ — reads and writes ZIP in the browser without a server.
 - **PDF.js** for PDF source images — rasterizes a selected page to a canvas before tiepointing.
 - **Canvas overlay** for the map image — gives full control over rotation and transform; use a
   custom `L.Layer` that redraws on Leaflet's `viewreset` and `move` events.
 - **IndexedDB** (via `idb`) for KMZ storage — binary blobs do not fit in localStorage.
 - **Service Worker** for offline — cache app shell and OSM tiles on demand.
+
+---
+
+## UI / Styling Rules
+
+The UI uses **Pico.css** (classless). Follow these rules:
+
+1. Write semantic HTML — Pico styles elements by tag, not class. `<button>`, `<input>`, `<dialog>`,
+   `<details>`, `<nav>`, `<article>`, `<progress>` all have opinionated defaults; use them.
+2. Use `<dialog>` (native) for modals — settings, wizard steps, safety warning. Open/close via
+   `dialog.showModal()` / `dialog.close()`.
+3. Use `<details>`/`<summary>` for the collapsible location details panel.
+4. Use `<progress value="0.4">` for KMZ download progress.
+5. Override only via Pico's CSS custom properties (e.g. `--pico-primary`, `--pico-spacing`).
+   Do not write new class-based selectors unless absolutely necessary.
+6. The full-screen Leaflet map is `position: fixed; inset: 0` and sits beneath floating UI panels.
+   All Pico-styled chrome floats over it with `position: fixed` or `absolute` + appropriate z-index.
+
+**Mobile-first layout**:
+- Primary action bar at the bottom (within thumb reach).
+- Minimum tap target: 44×44 px.
+- `font-size` in `rem` only; never `px` for text.
+- Test every screen in 375 px wide portrait — that is the baseline.
 
 ---
 
@@ -192,5 +217,6 @@ web/src/storage/
 - Do not store binary data in localStorage.
 - Call `watchPosition` and `requestPermission` only in response to a user gesture.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema exactly.
+- No external requests except OSM tile servers and optional user-provided KMZ URLs.
 - When unsure about the KMZ schema or feature behaviour, read `PRD.md` or inspect
   `app/src/main/java/com/custommapsapp/android/kml/` for the reference implementation.

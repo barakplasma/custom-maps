@@ -2,9 +2,15 @@
 
 ## Overview
 
-Custom Maps is a browser-based PWA that lets users georeference any raster image — a hand-drawn
-trail map, a building floor plan, a scanned paper map — and use it as a live GPS map. The app uses
-OpenStreetMap as its basemap and the browser Geolocation API for live position tracking.
+Custom Maps is a **local-first, open source** browser PWA that lets users georeference any raster
+image — a hand-drawn trail map, a building floor plan, a scanned paper map — and use it as a live
+GPS map. The app uses OpenStreetMap as its basemap and the browser Geolocation API for live
+position tracking. All data lives on the user's device; no account or server is required.
+
+The UI is designed **mobile-first**: every screen is optimized for one-handed use on a phone,
+with large tap targets, bottom-anchored controls, and minimal chrome. Styling is provided by
+**Pico.css** — a classless CSS framework — supplemented by minimal custom CSS only where Pico's
+defaults are insufficient.
 
 Maps are stored as `.kmz` files (ZIP archives containing an image + a KML document), which is an
 established open format compatible with Google Earth and the existing Custom Maps Android app.
@@ -174,19 +180,54 @@ single-precision causes visible positioning errors.
 
 ## Technology Stack
 
-| Concern | Choice |
-|---------|--------|
-| Map tiles | OpenStreetMap (tile.openstreetmap.org) |
-| Map library | Leaflet.js |
-| ZIP/KMZ read+write | JSZip |
-| PDF rasterization | PDF.js |
-| Offline tile cache | Service Worker + Cache API |
-| Map/KMZ storage | IndexedDB (`idb` wrapper) |
-| Settings | localStorage |
-| Build | Vite |
-| Language | TypeScript |
+| Concern | Choice | Notes |
+|---------|--------|-------|
+| Map tiles | OpenStreetMap | No API key; free |
+| Map library | Leaflet.js | Lightweight, mobile-friendly |
+| UI framework | **Pico.css** | Classless; semantic HTML only |
+| ZIP/KMZ read+write | JSZip | In-browser, no server |
+| PDF rasterization | PDF.js | Page picker before tiepointing |
+| Offline tile cache | Service Worker + Cache API | On-demand |
+| Map/KMZ storage | IndexedDB (`idb` wrapper) | Binary blobs |
+| Settings | localStorage | Key-value preferences |
+| Build | Vite | Fast dev + ESM output |
+| Language | TypeScript | Full double-precision math |
+
+### Pico.css Usage Rules
+
+- Use **semantic HTML elements** (`<nav>`, `<main>`, `<article>`, `<dialog>`, `<details>`, `<summary>`)
+  to get Pico styling automatically — avoid adding extra class names.
+- Use `<dialog>` for modals (settings, tiepoint wizard steps, safety warning).
+- Use `<details>`/`<summary>` for the collapsible details panel.
+- Use `<progress>` for KMZ download progress — Pico styles it natively.
+- Use Pico's CSS custom properties (`--pico-*`) for any colour or spacing overrides rather than
+  writing new selectors.
+- The map canvas itself sits outside Pico's flow (position: fixed, z-index layering) — Pico is
+  used for all chrome: library list, editor wizard, settings, panels.
 
 ---
+
+## Mobile UI Requirements
+
+- All interactive controls must have a minimum tap target of 44×44 px.
+- Primary actions (open map, locate me, toggle follow) live in a bottom action bar — thumbs-reach
+  territory.
+- Secondary actions (settings, create map) in a `<nav>` header or hamburger menu.
+- The map fills 100dvh; chrome overlays it as floating panels, not pushing it aside.
+- Wizard steps (tiepoint creation) use full-screen steps, one task per screen, with clear Back /
+  Next / Done buttons at the bottom.
+- Support both portrait and landscape without layout breakage.
+- Font sizes respect user OS accessibility settings (`rem`-based, no `px` for text).
+
+## Local-First & Open Source Requirements
+
+- Zero telemetry, zero analytics, zero external requests except OSM tile servers and optional
+  user-provided KMZ URLs.
+- All code is MIT or compatible open source; document the licence of every dependency in a
+  `LICENCES.md` or the `package.json` licence field.
+- No login, no account, no cloud sync. Every feature works 100% offline after installation.
+- The app must be self-hostable: `npm run build` produces a static folder deployable to any HTTP
+  server or GitHub Pages.
 
 ## PWA Requirements
 
