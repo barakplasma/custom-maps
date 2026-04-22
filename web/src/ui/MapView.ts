@@ -16,6 +16,23 @@ export class MapView {
   ) {}
 
   mount(container: HTMLElement): void {
+    try {
+      this.mountInternal(container);
+    } catch (err) {
+      container.innerHTML = '';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'padding:2rem;color:var(--pico-del-color,#c0392b);';
+      msg.textContent = `Failed to open map: ${(err as Error).message}`;
+      const back = document.createElement('button');
+      back.textContent = '← Back';
+      back.style.cssText = 'margin:0 2rem;';
+      back.addEventListener('click', this.onBack);
+      container.appendChild(msg);
+      container.appendChild(back);
+    }
+  }
+
+  private mountInternal(container: HTMLElement): void {
     container.innerHTML = '';
 
     // Map container — fills viewport
@@ -72,7 +89,7 @@ export class MapView {
     // Locate me button
     const locateBtn = document.createElement('button');
     locateBtn.textContent = '⊙ Locate me';
-    locateBtn.style.cssText = 'position:fixed;bottom:2rem;right:1rem;z-index:1000;padding:.75rem 1rem;font-size:1rem;';
+    locateBtn.style.cssText = 'position:fixed;bottom:max(2rem,calc(env(safe-area-inset-bottom) + 0.5rem));right:1rem;z-index:1000;padding:.75rem 1rem;font-size:1rem;';
 
     let hasFirstFix = false;
 

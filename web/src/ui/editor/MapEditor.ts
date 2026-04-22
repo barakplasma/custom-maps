@@ -100,7 +100,7 @@ export class MapEditor {
         document.getElementById('cm-save')!.addEventListener('click', async () => {
           const nameEl = document.getElementById('cm-map-name') as HTMLInputElement;
           const name = nameEl.value.trim() || defaultName || 'My map';
-          await this.save(container, imageBlob, imageFilename, name, tiepoints);
+          await this.save(container, image, imageBlob, imageFilename, name, tiepoints);
         });
         return;
       }
@@ -112,9 +112,9 @@ export class MapEditor {
           #cm-editor .split { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
           #cm-editor .split .img-half { flex: 1; position: relative; overflow: hidden; background: #111; }
           #cm-editor .split .img-half canvas { width: 100%; height: 100%; display: block; }
-          #cm-editor .split .map-half { flex: 1; position: relative; }
+          #cm-editor .split .map-half { flex: 1; position: relative; overflow: hidden; }
           #cm-editor .split .map-half > div { position: absolute; inset: 0; }
-          #cm-editor .controls { flex-shrink: 0; padding: .5rem 1rem; display: flex; gap: .5rem; align-items: center; background: var(--pico-background-color, #fff); border-top: 1px solid var(--pico-muted-border-color, #ddd); }
+          #cm-editor .controls { flex-shrink: 0; padding: .5rem 1rem; display: flex; gap: .5rem; align-items: center; background: var(--pico-background-color, #fff); border-top: 1px solid var(--pico-muted-border-color, #ddd); position: relative; z-index: 10; }
           #cm-editor .status { flex: 1; font-size: .85rem; }
         </style>
         <div id="cm-editor">
@@ -167,13 +167,19 @@ export class MapEditor {
 
       document.getElementById('cm-confirm')!.addEventListener('click', () => {
         if (!pendingPixel || !pendingGeo) return;
-        tiepoints.push({ xPixel: pendingPixel.x, yPixel: pendingPixel.y, lat: pendingGeo.lat, lon: pendingGeo.lon });
-        pendingPixel = null;
-        pendingGeo = null;
-        geoMarker?.remove();
-        geoMarker = null;
-        leafletMap?.remove();
-        render();
+        try {
+          tiepoints.push({ xPixel: pendingPixel.x, yPixel: pendingPixel.y, lat: pendingGeo.lat, lon: pendingGeo.lon });
+          pendingPixel = null;
+          pendingGeo = null;
+          geoMarker?.remove();
+          geoMarker = null;
+          leafletMap?.remove();
+          leafletMap = null;
+          render();
+        } catch (err) {
+          const statusEl = document.getElementById('cm-status');
+          if (statusEl) statusEl.textContent = `Error: ${(err as Error).message}`;
+        }
       });
     };
 
@@ -191,6 +197,7 @@ export class MapEditor {
 
   private async save(
     container: HTMLElement,
+    image: HTMLImageElement,
     imageBlob: Blob,
     imageFilename: string,
     name: string,
@@ -205,8 +212,8 @@ export class MapEditor {
         name,
         imageBlob,
         imageFilename: safeFilename,
-        imageWidth: 0,
-        imageHeight: 0,
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
         tiepoints,
       });
 

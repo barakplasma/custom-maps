@@ -27,8 +27,11 @@ export class ImagePointPicker {
   }
 
   private fitImage(): void {
-    const cw = this.canvas.clientWidth  || this.canvas.width;
-    const ch = this.canvas.clientHeight || this.canvas.height;
+    // getBoundingClientRect returns actual rendered CSS size (non-zero even before first paint),
+    // unlike clientWidth/clientHeight which can be 0 right after innerHTML replacement.
+    const rect = this.canvas.getBoundingClientRect();
+    const cw = rect.width  || this.canvas.width;
+    const ch = rect.height || this.canvas.height;
     this.canvas.width  = cw;
     this.canvas.height = ch;
     this.scale = Math.min(cw / this.image.naturalWidth, ch / this.image.naturalHeight) * 0.9;
@@ -92,6 +95,9 @@ export class ImagePointPicker {
       this.dragStart = null;
     });
     el.addEventListener('pointercancel', () => { this.dragStart = null; });
+
+    // Re-fit image when canvas is resized (e.g. orientation change)
+    new ResizeObserver(() => { this.fitImage(); this.draw(); }).observe(el);
 
     // Wheel zoom anchored at pointer
     el.addEventListener('wheel', e => {
