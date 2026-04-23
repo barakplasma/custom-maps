@@ -199,7 +199,7 @@ class RotatedImageLayer extends L.Layer {
 
 function toContainerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
   const [lat, lon] = conv.imageToLatLon(x, y);
-  return map.latLngToContainerPoint([lat, lon]);
+  return map.latLngToLayerPoint([lat, lon]);
 }
 
 function showToast(message: string, container: HTMLElement): void {
