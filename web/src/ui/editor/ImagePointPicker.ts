@@ -10,6 +10,7 @@ export class ImagePointPicker {
   private onPickCb: ((x: number, y: number) => void) | null = null;
   private dragStart: { px: number; py: number; tx: number; ty: number } | null = null;
   private moved = false;
+  private ro: ResizeObserver | null = null;
 
   constructor(canvas: HTMLCanvasElement, private image: HTMLImageElement) {
     this.canvas = canvas;
@@ -20,6 +21,8 @@ export class ImagePointPicker {
   }
 
   onPick(cb: (x: number, y: number) => void): void { this.onPickCb = cb; }
+
+  destroy(): void { this.ro?.disconnect(); this.ro = null; }
 
   addMark(x: number, y: number): void {
     this.picks.push({ x, y });
@@ -97,7 +100,8 @@ export class ImagePointPicker {
     el.addEventListener('pointercancel', () => { this.dragStart = null; });
 
     // Re-fit image when canvas is resized (e.g. orientation change)
-    new ResizeObserver(() => { this.fitImage(); this.draw(); }).observe(el);
+    this.ro = new ResizeObserver(() => { this.fitImage(); this.draw(); });
+    this.ro.observe(el);
 
     // Wheel zoom anchored at pointer
     el.addEventListener('wheel', e => {

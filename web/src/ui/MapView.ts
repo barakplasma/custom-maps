@@ -83,7 +83,7 @@ export class MapView {
     const backBtn = document.createElement('button');
     backBtn.textContent = '← Back';
     backBtn.style.cssText = 'position:fixed;top:1rem;left:1rem;z-index:1000;padding:.5rem 1rem;font-size:.875rem;';
-    backBtn.addEventListener('click', () => this.destroy().then(this.onBack));
+    backBtn.addEventListener('click', () => this.destroy().then(this.onBack).catch(console.error));
     container.appendChild(backBtn);
 
     // Locate me button
@@ -94,12 +94,10 @@ export class MapView {
     let hasFirstFix = false;
 
     locateBtn.addEventListener('click', () => {
-      if (this.tracker['watchId'] !== null) {
+      if (this.tracker.isActive()) {
         // Already tracking — re-center on latest known position
-        if (this.locationLayer) {
-          const pos = (this.locationLayer as LocationLayer & { lastLatLon?: [number,number] }).lastLatLon;
-          if (pos && this.map) this.map.flyTo(pos, Math.max(this.map.getZoom(), 15));
-        }
+        const pos = this.locationLayer?.lastLatLon;
+        if (pos && this.map) this.map.flyTo(pos, Math.max(this.map.getZoom(), 15));
         return;
       }
       locateBtn.disabled = true;
@@ -117,7 +115,7 @@ export class MapView {
         err => {
           locateBtn.disabled = false;
           locateBtn.textContent = '⊙ Locate me';
-          alert(`Location error: ${err.message}`);
+          showToast(`Location error: ${err.message}`, container);
         },
       );
     });
@@ -202,4 +200,12 @@ class RotatedImageLayer extends L.Layer {
 function toContainerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
   const [lat, lon] = conv.imageToLatLon(x, y);
   return map.latLngToContainerPoint([lat, lon]);
+}
+
+function showToast(message: string, container: HTMLElement): void {
+  const t = document.createElement('div');
+  t.textContent = message;
+  t.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;z-index:2000;max-width:90vw;text-align:center;';
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }

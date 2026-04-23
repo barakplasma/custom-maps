@@ -22,8 +22,8 @@ export class LocationLayer {
       }).addTo(this.map);
     } else {
       this.dot.setLatLng(latlng);
-      this.ring!.setLatLng(latlng);
-      this.ring!.setRadius(u.accuracy);
+      this.ring?.setLatLng(latlng);
+      this.ring?.setRadius(u.accuracy);
     }
   }
 
