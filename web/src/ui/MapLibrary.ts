@@ -77,14 +77,27 @@ export class MapLibrary {
           const overlay = await readKmz(rec.kmzBlob);
           this.openMap(overlay);
         } catch (err) {
-          alert(`Could not open map: ${(err as Error).message}`);
+          showToast(`Could not open map: ${(err as Error).message}`, this.root);
         }
       });
     });
 
+    // Two-tap delete: first tap → "Sure?", second tap → delete
     this.root.querySelectorAll<HTMLButtonElement>('button.del').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Delete this map?')) return;
+        if (btn.dataset.confirm !== '1') {
+          btn.dataset.confirm = '1';
+          btn.textContent = 'Sure?';
+          btn.style.color = 'var(--pico-del-color, #c0392b)';
+          setTimeout(() => {
+            if (btn.dataset.confirm === '1') {
+              btn.dataset.confirm = '';
+              btn.textContent = '×';
+              btn.style.color = '';
+            }
+          }, 3000);
+          return;
+        }
         await mapStore.delete(btn.dataset.del!);
         await this.render();
       });
@@ -98,7 +111,7 @@ export class MapLibrary {
       await this.render();
       this.openMap(overlay);
     } catch (err) {
-      alert(`Failed to open KMZ: ${(err as Error).message}`);
+      showToast(`Failed to open KMZ: ${(err as Error).message}`, this.root);
     }
   }
 
@@ -110,4 +123,12 @@ export class MapLibrary {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(message: string, container: HTMLElement): void {
+  const t = document.createElement('div');
+  t.textContent = message;
+  t.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;z-index:2000;max-width:90vw;text-align:center;';
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }

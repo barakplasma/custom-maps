@@ -22,6 +22,8 @@ export class LocationTracker {
     );
   }
 
+  isActive(): boolean { return this.watchId !== null; }
+
   stop(): void {
     if (this.watchId !== null) {
       navigator.geolocation.clearWatch(this.watchId);

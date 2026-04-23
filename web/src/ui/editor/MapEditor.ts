@@ -70,7 +70,9 @@ export class MapEditor {
       const canSave   = n >= MAX_TIEPOINTS;
 
       if (canSave) {
-        // Save-ready screen: dismiss Leaflet map, show name input + save button
+        // Save-ready screen: clean up picker and Leaflet map
+        picker?.destroy();
+        picker = null;
         leafletMap?.remove();
         leafletMap = null;
         container.innerHTML = `
