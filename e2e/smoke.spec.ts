@@ -25,7 +25,7 @@ async function buildKmz(): Promise<Buffer> {
 }
 
 // Picks an action from a saved map's "⋯" menu in the library.
-async function mapAction(page: Page, mapName: string, action: 'Share' | 'Edit tiepoints' | 'Delete'): Promise<void> {
+async function mapAction(page: Page, mapName: string, action: 'Share file' | 'Edit tiepoints' | 'Delete'): Promise<void> {
   await page.getByRole('button', { name: `More actions for ${mapName}` }).click();
   await page.getByRole('menuitem', { name: action }).click();
 }
@@ -78,7 +78,7 @@ test('a saved map can be shared as a .kmz (download where there is no share shee
   await page.reload();
 
   const download = page.waitForEvent('download');
-  await mapAction(page, 'E2E Test Map', 'Share');
+  await mapAction(page, 'E2E Test Map', 'Share file');
   const file = await download;
   expect(file.suggestedFilename()).toBe('E2E_Test_Map.kmz');
   const zip = await JSZip.loadAsync(await (await file.createReadStream()).toArray().then(Buffer.concat));
@@ -100,7 +100,7 @@ test('sharing sends the .kmz with a message linking to the app', async ({ page }
   });
   await expect(page.locator('.leaflet-container')).toBeVisible();
   await page.reload();
-  await mapAction(page, 'E2E Test Map', 'Share');
+  await mapAction(page, 'E2E Test Map', 'Share file');
 
   // Sharing reads the stored map first, so wait for it to reach the share sheet
   await expect.poll(() => page.evaluate(() => (window as unknown as { shared: unknown }).shared)).toEqual({
@@ -166,6 +166,11 @@ test.describe('installed app', () => {
     const sw = await (await request.get('/sw.js')).text();
     expect(sw).toContain('skipWaiting()');
     expect(sw).toContain('clientsClaim()');
+  });
+
+  test('short links bypass the offline app shell so the server can redirect them', async ({ request }) => {
+    const sw = await (await request.get('/sw.js')).text();
+    expect(sw).toContain('denylist:[/^\\/m\\//]');
   });
 
   test('has an installable web app manifest', async ({ page, request }) => {

@@ -36,5 +36,7 @@ export default defineConfig({
     // Never reuse: a leftover server on :4173 would silently test a stale build
     reuseExistingServer: false,
     timeout: 120_000,
+    // Link sharing on, pointing at a fake store that the tests stub with page.route
+    env: { MAPS_URL: 'https://maps.test/' },
   },
 });

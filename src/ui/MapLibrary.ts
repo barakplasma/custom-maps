@@ -5,13 +5,18 @@ import { MapView } from './MapView';
 import { MapEditor } from './editor/MapEditor';
 import { showToast } from './toast';
 import { readNow } from '../io/readNow';
-import { shareKmz } from './share';
+import { appUrl, shareKmz } from './share';
+import { isSharedId, publishKmz, sharedKmzUrl, sharingEnabled } from '../io/publish';
 
 export class MapLibrary {
   constructor(private root: HTMLElement) {}
 
   mount(): void {
-    this.render();
+    // Short links (/m/<id>) arrive as /?m=<id> (vercel.json redirect)
+    const shared = new URLSearchParams(location.search).get('m');
+    if (shared) history.replaceState(null, '', location.pathname);
+    if (shared && sharingEnabled && isSharedId(shared)) void this.openShared(shared);
+    else this.render();
   }
 
   private async render(): Promise<void> {
@@ -45,7 +50,8 @@ export class MapLibrary {
                       <wa-button slot="trigger" appearance="plain" size="l">
                         <wa-icon name="ellipsis-vertical" label="More actions for ${escapeHtml(m.name)}"></wa-icon>
                       </wa-button>
-                      <wa-dropdown-item value="share"><wa-icon slot="icon" name="share-2"></wa-icon>Share</wa-dropdown-item>
+                      ${sharingEnabled ? '<wa-dropdown-item value="link"><wa-icon slot="icon" name="link"></wa-icon>Share link</wa-dropdown-item>' : ''}
+                      <wa-dropdown-item value="share"><wa-icon slot="icon" name="share-2"></wa-icon>Share file</wa-dropdown-item>
                       <wa-dropdown-item value="edit"><wa-icon slot="icon" name="pencil"></wa-icon>Edit tiepoints</wa-dropdown-item>
                       <wa-dropdown-item value="delete" variant="danger"><wa-icon slot="icon" name="trash-2"></wa-icon>Delete</wa-dropdown-item>
                     </wa-dropdown>
@@ -68,6 +74,32 @@ export class MapLibrary {
             <wa-button appearance="outlined" data-dialog="close">Cancel</wa-button>
             <wa-button id="cm-delete-confirm" variant="danger">
               <wa-icon slot="start" name="trash-2"></wa-icon> Delete
+            </wa-button>
+          </div>
+        </wa-dialog>
+        <wa-dialog id="cm-link-dialog" label="Share link" light-dismiss>
+          <div class="wa-cluster wa-gap-s wa-align-items-center" data-state="busy">
+            <wa-spinner></wa-spinner> <span class="wa-body-m">Preparing link…</span>
+          </div>
+          <div class="wa-stack wa-gap-m" data-state="ready">
+            <div class="wa-cluster wa-justify-content-center">
+              <wa-qr-code size="200" label="Scan to open this map"></wa-qr-code>
+            </div>
+            <div class="wa-flank:end wa-gap-2xs wa-align-items-end">
+              <wa-input label="Link" readonly></wa-input>
+              <wa-copy-button copy-label="Copy link"></wa-copy-button>
+            </div>
+          </div>
+          <wa-callout variant="warning" data-state="failed">
+            <wa-icon slot="icon" name="circle-alert"></wa-icon>
+            <span></span>
+          </wa-callout>
+          <div slot="footer" class="wa-cluster wa-gap-s wa-justify-content-end">
+            <wa-button id="cm-link-file" appearance="outlined" data-state="failed">
+              <wa-icon slot="start" name="share-2"></wa-icon> Share file instead
+            </wa-button>
+            <wa-button id="cm-link-share" variant="brand" data-state="ready">
+              <wa-icon slot="start" name="share-2"></wa-icon> Share
             </wa-button>
           </div>
         </wa-dialog>
@@ -123,6 +155,7 @@ export class MapLibrary {
         const rec = await mapStore.get(id);
         if (!rec) return;
         if (action === 'share') await shareKmz(rec.kmzBlob, rec.name);
+        if (action === 'link') await this.shareLink(rec.kmzBlob, rec.name);
         if (action === 'edit') {
           try {
             const overlay = await readKmz(rec.kmzBlob);
@@ -139,6 +172,55 @@ export class MapLibrary {
       dialog.open = false;
       await this.render();
     });
+  }
+
+  // Publishes the map and shows its short link (QR code, copy, share sheet). Sharing happens on
+  // a second tap: after an upload the share sheet would refuse to open without a fresh gesture.
+  private async shareLink(kmz: Blob, name: string): Promise<void> {
+    const dialog = this.root.querySelector<HTMLElement & { open: boolean }>('#cm-link-dialog')!;
+    const show = (state: string) =>
+      dialog.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => { el.hidden = el.dataset.state !== state; });
+    const shareButton = dialog.querySelector<HTMLElement>('#cm-link-share')!;
+    const fileButton = dialog.querySelector<HTMLElement>('#cm-link-file')!;
+    fileButton.onclick = () => { dialog.open = false; void shareKmz(kmz, name); };
+    show('busy');
+    dialog.open = true;
+    let url: string;
+    try {
+      url = `${appUrl()}m/${await publishKmz(kmz)}`;
+    } catch (err) {
+      dialog.querySelector('wa-callout span')!.textContent = `Couldn't create a link: ${(err as Error).message}.`;
+      show('failed');
+      return;
+    }
+    dialog.querySelector('wa-qr-code')!.value = url;
+    dialog.querySelector('wa-input')!.value = url;
+    dialog.querySelector('wa-copy-button')!.value = url;
+    shareButton.onclick = () => navigator.share({ title: name, text: `"${name}" — a live GPS map in Custom Maps:`, url })
+      .catch(() => { /* closed the share sheet */ });
+    show('ready');
+    shareButton.hidden = !navigator.share; // desktop browsers: the copy button is enough
+  }
+
+  // Opens a map someone shared by link, saving it so it works offline from then on.
+  private async openShared(id: string): Promise<void> {
+    const recId = `shared-${id}`;
+    try {
+      let rec = await mapStore.get(recId);
+      if (!rec) {
+        const res = await fetch(sharedKmzUrl(id));
+        if (!res.ok) throw new Error(res.status === 404 ? 'it no longer exists' : `HTTP ${res.status}`);
+        const kmzBlob = await res.blob();
+        const overlay = await readKmz(kmzBlob);
+        rec = { id: recId, name: overlay.name || 'Shared map', kmzBlob, createdAt: Date.now() };
+        await mapStore.put(rec);
+      }
+      await this.render();
+      this.openMap(await readKmz(rec.kmzBlob));
+    } catch (err) {
+      await this.render();
+      showToast(`Could not open the shared map: ${(err as Error).message}`);
+    }
   }
 
   private async importKmz(blob: Blob, name: string): Promise<void> {

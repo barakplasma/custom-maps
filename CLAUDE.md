@@ -22,6 +22,7 @@ custom-maps/                 ← Vite + TypeScript app at the repo root
 │   ├── ui/                  ← screens, Leaflet layers, editor wizard, Web Awesome setup
 │   ├── storage/             ← IndexedDB + localStorage wrappers
 │   └── styles.css           ← app-level CSS on Web Awesome tokens
+├── api/upload.ts            ← the one Vercel Function: upload tokens + free-tier quota for short links
 ├── e2e/                     ← Playwright smoke tests
 ├── public/
 │   └── EGM96Geoid1deg.dac   ← geoid grid asset (~130 KB)
@@ -96,6 +97,14 @@ custom `build.target`. Use platform features directly:
 - **Screen Wake Lock** while GPS tracking (`keepScreenOnWhileLocating` in `ui/locate.ts`).
 - **Web Share** with files for saved `.kmz` plus a message linking to the app (`__APP_URL__`,
   the production URL in Vercel builds); falls back to a download.
+- **Short links** (`/m/<id>`, ⋯ → Share link): the map is shrunk (≤ 2560 px JPEG), named by a
+  hash of its bytes and uploaded from the browser to a public Vercel Blob store; `api/upload.ts`
+  hands out upload tokens only while under the caps that keep Blob inside the free Hobby plan
+  (600 MB, 200 uploads / 30 days, 3 MB per map — Hobby blocks Blob for 30 days when exceeded).
+  `vercel.json` redirects `/m/<id>` to `/?m=<id>`; the app downloads `MAPS_URL/m/<id>.kmz` and
+  saves it. `MAPS_URL` is derived from the store's token at build time (`vite.config.ts`);
+  without it link sharing is hidden. To self-host, set `MAPS_URL` and replace `publishKmz()`'s
+  upload and `api/upload.ts`.
 - `100dvh`, safe-area insets, `interactive-widget=resizes-content`, `overscroll-behavior: none`.
 
 ---
@@ -222,6 +231,7 @@ src/core/
   GeoidHeight.ts           — EGM96 lookup                                   (planned)
 
 src/io/
+  publish.ts               — short links: shrink, content-hash id, upload to Blob, shared URL
   KmzReader.ts             — JSZip + DOMParser → GroundOverlay + image Blob (parseKml is pure)
   KmzWriter.ts             — GroundOverlay + image Blob → JSZip Blob (buildKml is pure)
 
@@ -232,7 +242,8 @@ src/ui/
   MapView.ts               — main map page, Leaflet map + canvas image overlay
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
   DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
-  MapLibrary.ts            — IndexedDB-backed map list; ⋯ menu: share / edit tiepoints / delete
+  MapLibrary.ts            — IndexedDB-backed map list; ⋯ menu: share link / share file / edit
+                             tiepoints / delete; opens shared links (?m=<id>)
   locate.ts                — leaflet.locatecontrol setup (follow-me, compass) + wake lock
   share.ts                 — Web Share of a .kmz with a message linking to the app
   webawesome.ts            — component registration + bundled icon list
@@ -322,7 +333,8 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
   gesture — or after `geolocationAlreadyGranted()` confirms no prompt will appear.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
   `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `src/io/Kml.test.ts` guards it).
-- No external requests except OSM tile servers and optional user-provided KMZ URLs. Vercel Web
-  Analytics / Speed Insights are same-origin and only injected in Vercel builds (`src/main.ts`).
+- No external requests except OSM tile servers and shared maps (Vercel Blob: `MAPS_URL`, and
+  uploads via `vercel.com/api/blob`). Vercel Web Analytics / Speed Insights are same-origin and
+  only injected in Vercel builds (`src/main.ts`).
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
 - Every change ships with a test (unit or e2e) and `npm run check` passing.
