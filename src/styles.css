@@ -53,12 +53,15 @@ wa-button > wa-icon { pointer-events: none; }
   right: var(--wa-space-m);
 }
 
-/* Map editor: image on top, map below, splitting the space between header and action bar. */
+/* Map editor: image on top, map below, splitting the space between header and action bar.
+   The screen is exactly one viewport tall, and the canvas and map are absolutely positioned,
+   so their pixel sizes can't feed back into the layout as the mobile address bar moves. */
+.app-screen:has(.editor-split) { height: 100dvh; }
 .editor-split { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .editor-split > * { flex: 1; position: relative; overflow: hidden; min-height: 0; }
 .editor-image { background: var(--wa-color-surface-lowered); }
 /* touch-action: none lets the picker handle one-finger pan and two-finger pinch itself. */
-.editor-image canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.editor-image canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .editor-map > div { position: absolute; inset: 0; }
 
 /* ---- Leaflet, themed to match ---- */

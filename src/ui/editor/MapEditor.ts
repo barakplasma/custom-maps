@@ -4,6 +4,7 @@ import { mapStore } from '../../storage/MapStore';
 import type { Tiepoint } from '../../core/Tiepoint';
 import { ImagePointPicker } from './ImagePointPicker';
 import { showToast } from '../toast';
+import { readNow } from '../../io/readNow';
 import { LocateControl } from '../LocateControl';
 import { geolocationAlreadyGranted } from '../../location/LocationTracker';
 import { getEditorView, setEditorView } from '../../storage/Prefs';
@@ -43,10 +44,13 @@ export class MapEditor {
     document.getElementById('cm-img-input')!.addEventListener('change', async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const blob = file;
-      const filename = file.name;
-      const img = await loadImage(blob);
-      this.renderStepB(container, img, blob, filename);
+      try {
+        const blob = await readNow(file);
+        const img = await loadImage(blob);
+        this.renderStepB(container, img, blob, file.name);
+      } catch (err) {
+        showToast(`Could not read that image: ${(err as Error).message}`);
+      }
     });
   }
 

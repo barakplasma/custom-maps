@@ -4,6 +4,7 @@ import type { GroundOverlay } from '../core/GroundOverlay';
 import { MapView } from './MapView';
 import { MapEditor } from './editor/MapEditor';
 import { showToast } from './toast';
+import { readNow } from '../io/readNow';
 
 export class MapLibrary {
   constructor(private root: HTMLElement) {}
@@ -74,7 +75,11 @@ export class MapLibrary {
     document.getElementById('cm-file-input')!.addEventListener('change', async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      await this.importKmz(file, file.name.replace(/\.kmz$/i, ''));
+      try {
+        await this.importKmz(await readNow(file), file.name.replace(/\.kmz$/i, ''));
+      } catch (err) {
+        showToast(`Could not read that file: ${(err as Error).message}`);
+      }
     });
 
     document.getElementById('cm-create')!.addEventListener('click', () => {

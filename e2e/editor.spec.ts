@@ -124,3 +124,31 @@ test('two-finger pinch zooms the map image', async ({ page, browserName }) => {
   // A pinch is not a tap: no point was picked
   await expect(page.getByText('Tap a spot on the image')).toBeVisible();
 });
+
+test('tiepoint screen fits the viewport with a tall photo, even as the address bar moves', async ({ page }) => {
+  await recordTiles(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create map' }).click();
+  // A tall portrait photo, like a picture of a trailhead sign taken on a phone
+  const tall = await page.evaluate(async () => {
+    const c = new OffscreenCanvas(900, 1600);
+    c.getContext('2d')!.fillRect(0, 0, 900, 1600);
+    return [...new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer())];
+  });
+  await page.locator('#cm-img-input').setInputFiles({ name: 'sign.png', mimeType: 'image/png', buffer: Buffer.from(tall) });
+  await expect(page.locator('#cm-leaflet.leaflet-container')).toBeVisible();
+
+  const { width, height } = page.viewportSize()!;
+  for (const h of [height, height - 80, height]) {
+    await page.setViewportSize({ width, height: h });
+    await expect.poll(() => page.evaluate(() => {
+      const img = document.querySelector('.editor-image')!.getBoundingClientRect().height;
+      const map = document.querySelector('.editor-map')!.getBoundingClientRect().height;
+      return {
+        noScroll: document.scrollingElement!.scrollHeight <= innerHeight,
+        headerAtTop: document.querySelector('.app-bar')!.getBoundingClientRect().top === 0,
+        equalHalves: Math.abs(img - map) < 1,
+      };
+    })).toEqual({ noScroll: true, headerAtTop: true, equalHalves: true });
+  }
+});
