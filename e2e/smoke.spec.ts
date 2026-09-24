@@ -40,7 +40,7 @@ test('library screen renders with no JS errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.reload();
-  await expect(page.getByText('Custom Maps', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open file' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create map' })).toBeVisible();
   expect(errors).toEqual([]);
@@ -56,10 +56,42 @@ test('importing a KMZ opens it on the map and saves it to the library', async ({
 
   // Reload: the map must persist in IndexedDB and be listed in the library.
   await page.reload();
-  await expect(page.getByRole('button', { name: 'E2E Test Map' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'E2E Test Map', exact: true })).toBeVisible();
+});
+
+test('deleting a map asks for confirmation', async ({ page }) => {
+  await page.locator('#cm-file-input').setInputFiles({
+    name: 'e2e.kmz', mimeType: 'application/vnd.google-earth.kmz', buffer: await buildKmz(),
+  });
+  await expect(page.locator('.leaflet-container')).toBeVisible();
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Delete E2E Test Map' }).click();
+  // wa-dialog's host has no box of its own, so check its open state rather than visibility
+  const dialog = page.locator('wa-dialog[label="Delete map?"]');
+  await expect(dialog).toHaveAttribute('open');
+  await expect(dialog.getByText('will be removed from this device')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('button', { name: 'E2E Test Map', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete E2E Test Map' }).click();
+  await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByText('No maps yet')).toBeVisible();
+});
+
+test('follows the system light/dark preference live', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/wa-dark/);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveClass(/wa-light/);
+  await expect(page.locator('html')).not.toHaveClass(/wa-dark/);
 });
 
 test('create-map wizard opens', async ({ page }) => {
   await page.getByRole('button', { name: 'Create map' }).click();
   await expect(page.locator('#cm-library')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Pick a map image' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
 });

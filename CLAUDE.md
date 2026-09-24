@@ -4,7 +4,8 @@
 
 A **local-first, open source** browser PWA that lets users georeference any raster image and use
 it as a live GPS map, with OpenStreetMap as the basemap and the browser Geolocation API for
-position tracking. No server, no account, no analytics. Mobile-first UI styled with Pico.css.
+position tracking. No server, no account, no analytics. Mobile-first UI built with Web Awesome
+components, following the system light/dark setting.
 
 Full product requirements are in `PRD.md`. Read it first.
 
@@ -13,21 +14,22 @@ Full product requirements are in `PRD.md`. Read it first.
 ## Repository Layout
 
 ```
-custom-maps/
-├── web/                     ← web app source (Vite + TypeScript)
-│   ├── src/
-│   │   ├── core/            ← pure math, no DOM/Leaflet
-│   │   ├── io/              ← KMZ read/write
-│   │   ├── location/        ← geolocation + compass
-│   │   ├── ui/              ← Leaflet layers, panels, editor wizard
-│   │   └── storage/         ← IndexedDB + localStorage wrappers
-│   ├── e2e/                 ← Playwright smoke tests
-│   ├── public/
-│   │   └── EGM96Geoid1deg.dac  ← geoid grid asset (~130 KB)
-│   └── index.html
+custom-maps/                 ← Vite + TypeScript app at the repo root
+├── src/
+│   ├── core/                ← pure math, no DOM/Leaflet
+│   ├── io/                  ← KMZ read/write
+│   ├── location/            ← geolocation + compass
+│   ├── ui/                  ← screens, Leaflet layers, editor wizard, Web Awesome setup
+│   ├── storage/             ← IndexedDB + localStorage wrappers
+│   └── styles.css           ← app-level CSS on Web Awesome tokens
+├── e2e/                     ← Playwright smoke tests
+├── public/
+│   └── EGM96Geoid1deg.dac   ← geoid grid asset (~130 KB)
+├── index.html
+├── vercel.json
 ├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
 ├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
-├── .claude/                 ← SessionStart hook: installs web deps in cloud sessions
+├── .claude/                 ← SessionStart hook: installs deps in cloud sessions
 ├── PRD.md
 └── CLAUDE.md
 ```
@@ -39,7 +41,7 @@ The original Android app was removed; it is in git history only. Its KMZ schema 
 
 ## Build, Test, Verify
 
-All commands run from `web/`:
+All commands run from the repo root:
 
 ```sh
 npm run dev          # dev server on :5173
@@ -57,7 +59,9 @@ Workflow for changes:
 2. **UI changes**: add or extend a spec in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
-   375×740 and look at it, rather than guessing from the DOM.
+   375×740 and look at it, rather than guessing from the DOM — in **both** color schemes
+   (`browser.newContext({ colorScheme: 'dark' })`). Leaflet `flyTo` animations can take several
+   seconds; wait before judging map screenshots.
 4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
    so they can be unit tested without a browser.
 
@@ -65,7 +69,7 @@ In Claude Code on the web, Chromium is preinstalled and the SessionStart hook ru
 `npm install`, so every command above works immediately. Elsewhere, run
 `npx playwright install chromium` once.
 
-Deployment: Vercel builds `web/` (see `web/vercel.json`) on every push; `main` is production at
+Deployment: Vercel builds the repo (see `vercel.json`) on every push; `master` is production at
 <https://custom-maps-nu.vercel.app/>. Other `*.vercel.app` aliases are behind Vercel SSO.
 
 ---
@@ -220,7 +224,8 @@ read `gx:LatLonQuad`.
 ## Key Decisions
 
 - **Leaflet.js** for the OSM map — lightweight, no API key, broad plugin ecosystem.
-- **Pico.css** for all UI chrome — classless, semantic HTML; no component framework needed.
+- **Web Awesome** (MIT, web components) for all UI chrome — works with plain TypeScript, no framework.
+  Icons are bundled **Lucide** SVGs (ISC), not Web Awesome's default Font Awesome CDN.
 - **JSZip** for KMZ — reads and writes ZIP in the browser without a server.
 - **PDF.js** for PDF source images — rasterizes a selected page to a canvas before tiepointing.
 - **Canvas overlay** for the map image — gives full control over rotation and transform; use a
@@ -232,18 +237,31 @@ read `gx:LatLonQuad`.
 
 ## UI / Styling Rules
 
-The UI uses **Pico.css** (classless). Follow these rules:
+The UI uses **Web Awesome** (`@awesome.me/webawesome`). Its package ships agent-oriented docs:
+`node_modules/@awesome.me/webawesome/dist/skills/webawesome/references/components/<name>.md` (component
+APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component's reference before styling it.
 
-1. Write semantic HTML — Pico styles elements by tag, not class. `<button>`, `<input>`, `<dialog>`,
-   `<details>`, `<nav>`, `<article>`, `<progress>` all have opinionated defaults; use them.
-2. Use `<dialog>` (native) for modals — settings, wizard steps, safety warning. Open/close via
-   `dialog.showModal()` / `dialog.close()`.
-3. Use `<details>`/`<summary>` for the collapsible location details panel.
-4. Use `<progress value="0.4">` for KMZ download progress.
-5. Override only via Pico's CSS custom properties (e.g. `--pico-primary`, `--pico-spacing`).
-   Do not write new class-based selectors unless absolutely necessary.
-6. The full-screen Leaflet map is `position: fixed; inset: 0` and sits beneath floating UI panels.
-   All Pico-styled chrome floats over it with `position: fixed` or `absolute` + appropriate z-index.
+1. **Register components** you use in `src/ui/webawesome.ts` (they are cherry-picked imports; an
+   unregistered `<wa-*>` tag renders as nothing).
+2. **Icons**: `<wa-icon name="...">` resolves against the bundled Lucide list in
+   `src/ui/webawesome.ts`. Add new names there — never point the library at a CDN.
+   Icon-only buttons need `label` on the icon for accessibility.
+3. **Colors, spacing, radii, fonts: tokens only** (`--wa-color-surface-*`, `--wa-color-text-*`,
+   `--wa-space-*`, …) and utility classes (`wa-stack`, `wa-cluster`, `wa-gap-*`, `wa-heading-*`,
+   `wa-body-*`). No hex/px literals — they break dark mode.
+4. **Light/dark** follows the OS setting: `index.html` sets `wa-light`/`wa-dark` on `<html>` before first
+   paint, `src/ui/colorScheme.ts` tracks changes. In dark mode the OSM tile pane is CSS-inverted
+   (`src/styles.css`); never filter the user's map image or GPS layers.
+5. Dialogs: `<wa-dialog label="…">` toggled with `.open`. Notifications: `showToast()` in
+   `src/ui/toast.ts` (one shared `<wa-toast>`), never `alert()`/`confirm()`.
+6. Shared layout classes live in `src/styles.css` (`app-screen`, `app-bar`, `app-content`,
+   `action-bar`, `float-*`). Prefer them over new per-screen `<style>` blocks or inline styles.
+7. The full-screen Leaflet map is `position: fixed; inset: 0` (`.map-fullscreen`) beneath floating
+   controls (`.float-top-start`, `.float-bottom-end`, z-index 1000).
+8. Testing: Playwright can't compute accessible names for `wa-dialog`, and its host has no box
+   (never "visible"); locate it with `page.locator('wa-dialog[label="…"]')` and assert
+   `toHaveAttribute('open')` or the visibility of its content. Buttons work with
+   `getByRole('button', { name })`.
 
 **Mobile-first layout**:
 - Primary action bar at the bottom (within thumb reach).

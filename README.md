@@ -4,6 +4,8 @@ Use almost any map image — a trail map, a campus map, a scanned paper map — 
 your browser. Pin a few points on the image to real-world locations, and Custom Maps overlays it
 on OpenStreetMap and shows where you are on it.
 
+Works day or night: the interface follows your device's light/dark setting.
+
 Local-first: no server, no account, no analytics. Maps are stored in your browser (IndexedDB) and
 can be exported as `.kmz` files that are compatible with Google Earth and the original Custom Maps
 Android app.
@@ -12,10 +14,10 @@ Live: <https://custom-maps-nu.vercel.app/>
 
 ## Develop
 
-The app lives in [`web/`](web) (Vite + TypeScript + Leaflet + Pico.css).
+Vite + TypeScript + Leaflet, with [Web Awesome](https://webawesome.com) UI components and
+[Lucide](https://lucide.dev) icons.
 
 ```sh
-cd web
 npm install
 npm run dev          # http://localhost:5173
 ```

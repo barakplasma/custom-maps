@@ -3,6 +3,8 @@ import { GeoToImageConverter } from '../core/GeoToImageConverter';
 import type { GroundOverlay } from '../core/GroundOverlay';
 import { LocationTracker } from '../location/LocationTracker';
 import { LocationLayer } from './LocationLayer';
+import { showToast } from './toast';
+import type WaButton from '@awesome.me/webawesome/dist/components/button/button.js';
 
 export class MapView {
   private map: L.Map | null = null;
@@ -19,16 +21,16 @@ export class MapView {
     try {
       this.mountInternal(container);
     } catch (err) {
-      container.innerHTML = '';
-      const msg = document.createElement('p');
-      msg.style.cssText = 'padding:2rem;color:var(--pico-del-color,#c0392b);';
-      msg.textContent = `Failed to open map: ${(err as Error).message}`;
-      const back = document.createElement('button');
-      back.textContent = '← Back';
-      back.style.cssText = 'margin:0 2rem;';
-      back.addEventListener('click', this.onBack);
-      container.appendChild(msg);
-      container.appendChild(back);
+      container.innerHTML = `
+        <div class="app-content wa-stack wa-gap-m">
+          <wa-callout variant="danger">
+            <wa-icon slot="icon" name="circle-alert"></wa-icon>
+            <span></span>
+          </wa-callout>
+          <wa-button appearance="outlined"><wa-icon slot="start" name="arrow-left"></wa-icon> Back</wa-button>
+        </div>`;
+      container.querySelector('wa-callout span')!.textContent = `Failed to open map: ${(err as Error).message}`;
+      container.querySelector('wa-button')!.addEventListener('click', this.onBack);
     }
   }
 
@@ -37,10 +39,12 @@ export class MapView {
 
     // Map container — fills viewport
     const mapDiv = document.createElement('div');
-    mapDiv.style.cssText = 'position:fixed;inset:0;';
+    mapDiv.className = 'map-fullscreen';
     container.appendChild(mapDiv);
 
-    this.map = L.map(mapDiv, { zoomControl: true, zoomSnap: 0.25, zoomDelta: 0.5 });
+    this.map = L.map(mapDiv, { zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5 });
+    // Top-left is taken by the Back button
+    L.control.zoom({ position: 'topright' }).addTo(this.map);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -79,17 +83,20 @@ export class MapView {
   }
 
   private mountFloatingUI(container: HTMLElement): void {
-    // Back button
-    const backBtn = document.createElement('button');
-    backBtn.textContent = '← Back';
-    backBtn.style.cssText = 'position:fixed;top:1rem;left:1rem;z-index:1000;padding:.5rem 1rem;font-size:.875rem;';
-    backBtn.addEventListener('click', () => this.destroy().then(this.onBack).catch(console.error));
-    container.appendChild(backBtn);
+    container.insertAdjacentHTML('beforeend', `
+      <wa-button id="cm-map-back" class="float-top-start" appearance="filled-outlined" pill size="l">
+        <wa-icon name="arrow-left" label="Back to maps"></wa-icon>
+      </wa-button>
+      <wa-button id="cm-locate" class="float-bottom-end" variant="brand" pill size="l">
+        <wa-icon slot="start" name="locate"></wa-icon> <span>Locate me</span>
+      </wa-button>`);
 
-    // Locate me button
-    const locateBtn = document.createElement('button');
-    locateBtn.textContent = '⊙ Locate me';
-    locateBtn.style.cssText = 'position:fixed;bottom:max(2rem,calc(env(safe-area-inset-bottom) + 0.5rem));right:1rem;z-index:1000;padding:.75rem 1rem;font-size:1rem;';
+    const backBtn = container.querySelector<HTMLElement>('#cm-map-back')!;
+    backBtn.addEventListener('click', () => this.destroy().then(this.onBack).catch(console.error));
+
+    const locateBtn = container.querySelector<WaButton>('#cm-locate')!;
+    const locateLabel = locateBtn.querySelector('span')!;
+    const locateIcon = locateBtn.querySelector('wa-icon')!;
 
     let hasFirstFix = false;
 
@@ -100,26 +107,24 @@ export class MapView {
         if (pos && this.map) this.map.flyTo(pos, Math.max(this.map.getZoom(), 15));
         return;
       }
-      locateBtn.disabled = true;
-      locateBtn.textContent = '⊙ Searching…';
+      locateBtn.loading = true;
       this.tracker.start(
         u => {
           this.locationLayer!.update(u);
           if (!hasFirstFix) {
             hasFirstFix = true;
             this.map?.flyTo([u.lat, u.lon], 15);
-            locateBtn.disabled = false;
-            locateBtn.textContent = '⊙ Re-center';
+            locateBtn.loading = false;
+            locateLabel.textContent = 'Re-center';
+            locateIcon.setAttribute('name', 'locate-fixed');
           }
         },
         err => {
-          locateBtn.disabled = false;
-          locateBtn.textContent = '⊙ Locate me';
-          showToast(`Location error: ${err.message}`, container);
+          locateBtn.loading = false;
+          showToast(`Location error: ${err.message}`);
         },
       );
     });
-    container.appendChild(locateBtn);
   }
 
   async destroy(): Promise<void> {
@@ -200,12 +205,4 @@ class RotatedImageLayer extends L.Layer {
 function toContainerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
   const [lat, lon] = conv.imageToLatLon(x, y);
   return map.latLngToContainerPoint([lat, lon]);
-}
-
-function showToast(message: string, container: HTMLElement): void {
-  const t = document.createElement('div');
-  t.textContent = message;
-  t.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;z-index:2000;max-width:90vw;text-align:center;';
-  container.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
 }

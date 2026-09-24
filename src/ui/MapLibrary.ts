@@ -3,6 +3,7 @@ import { mapStore } from '../storage/MapStore';
 import type { GroundOverlay } from '../core/GroundOverlay';
 import { MapView } from './MapView';
 import { MapEditor } from './editor/MapEditor';
+import { showToast } from './toast';
 
 export class MapLibrary {
   constructor(private root: HTMLElement) {}
@@ -16,41 +17,52 @@ export class MapLibrary {
     maps.sort((a, b) => b.createdAt - a.createdAt);
 
     this.root.innerHTML = `
-      <style>
-        #cm-library nav { position: sticky; top: 0; z-index: 10; }
-        #cm-library .map-list { list-style: none; padding: 0; margin: 0; }
-        #cm-library .map-list li {
-          display: flex; align-items: center; gap: .5rem;
-          padding: .75rem 0; border-bottom: 1px solid var(--pico-muted-border-color, #e0e0e0);
-        }
-        #cm-library .map-list li button.open { flex: 1; text-align: left; background: none; border: none;
-          cursor: pointer; padding: .5rem; border-radius: .25rem; font-size: 1rem; }
-        #cm-library .map-list li button.open:hover { background: var(--pico-primary-background, #f0f4ff); }
-        #cm-library .map-list li button.del { min-width: 44px; min-height: 44px; }
-        #cm-library .empty { text-align: center; padding: 3rem 1rem; color: var(--pico-muted-color, #888); }
-        #cm-library input[type=file] { display: none; }
-      </style>
-      <div id="cm-library">
-        <nav>
-          <ul><li><strong>Custom Maps</strong></li></ul>
-          <ul>
-            <li><button id="cm-import" class="outline">Open file</button></li>
-            <li><button id="cm-create">Create map</button></li>
-          </ul>
-        </nav>
-        <main class="container">
-          <input type="file" id="cm-file-input" accept=".kmz">
+      <div id="cm-library" class="app-screen">
+        <header class="app-bar">
+          <h1 class="wa-heading-l wa-cluster wa-gap-xs wa-align-items-center">
+            <wa-icon name="map"></wa-icon> Custom Maps
+          </h1>
+        </header>
+        <main class="app-content">
+          <input type="file" id="cm-file-input" class="hidden-input" accept=".kmz">
           ${maps.length === 0
-            ? '<p class="empty">No maps yet. Open a .kmz file or create a new map.</p>'
+            ? `<div class="empty-state wa-stack wa-gap-s wa-align-items-center wa-text-center">
+                 <wa-icon name="map-pin"></wa-icon>
+                 <h2 class="wa-heading-m">No maps yet</h2>
+                 <p class="wa-body-m wa-color-text-quiet">Open a .kmz file, or turn any map image into a GPS map.</p>
+               </div>`
             : `<ul class="map-list">
                 ${maps.map(m => `
-                  <li>
-                    <button class="open" data-id="${m.id}">${escapeHtml(m.name)}</button>
-                    <button class="del outline" data-del="${m.id}" aria-label="Delete" style="min-width:44px;min-height:44px;">×</button>
+                  <li class="wa-cluster wa-gap-2xs wa-align-items-center">
+                    <wa-button class="open" appearance="plain" size="l" data-id="${m.id}">
+                      <wa-icon slot="start" name="map"></wa-icon>
+                      ${escapeHtml(m.name)}
+                      <wa-icon slot="end" name="chevron-right"></wa-icon>
+                    </wa-button>
+                    <wa-button class="del" appearance="plain" variant="danger" size="l" data-del="${m.id}" data-name="${escapeHtml(m.name)}">
+                      <wa-icon name="trash-2" label="Delete ${escapeHtml(m.name)}"></wa-icon>
+                    </wa-button>
                   </li>`).join('')}
                </ul>`
           }
         </main>
+        <footer class="action-bar even wa-cluster wa-gap-s">
+          <wa-button id="cm-import" appearance="outlined">
+            <wa-icon slot="start" name="folder-open"></wa-icon> Open file
+          </wa-button>
+          <wa-button id="cm-create" variant="brand">
+            <wa-icon slot="start" name="plus"></wa-icon> Create map
+          </wa-button>
+        </footer>
+        <wa-dialog id="cm-delete-dialog" label="Delete map?" light-dismiss>
+          <p class="wa-body-m" id="cm-delete-text"></p>
+          <div slot="footer" class="wa-cluster wa-gap-s wa-justify-content-end">
+            <wa-button appearance="outlined" data-dialog="close">Cancel</wa-button>
+            <wa-button id="cm-delete-confirm" variant="danger">
+              <wa-icon slot="start" name="trash-2"></wa-icon> Delete
+            </wa-button>
+          </div>
+        </wa-dialog>
       </div>
     `;
 
@@ -69,7 +81,7 @@ export class MapLibrary {
       editor.mount(this.root);
     });
 
-    this.root.querySelectorAll<HTMLButtonElement>('button.open').forEach(btn => {
+    this.root.querySelectorAll<HTMLElement>('wa-button.open').forEach(btn => {
       btn.addEventListener('click', async () => {
         const rec = await mapStore.get(btn.dataset.id!);
         if (!rec) return;
@@ -77,30 +89,27 @@ export class MapLibrary {
           const overlay = await readKmz(rec.kmzBlob);
           this.openMap(overlay);
         } catch (err) {
-          showToast(`Could not open map: ${(err as Error).message}`, this.root);
+          showToast(`Could not open map: ${(err as Error).message}`);
         }
       });
     });
 
-    // Two-tap delete: first tap → "Sure?", second tap → delete
-    this.root.querySelectorAll<HTMLButtonElement>('button.del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (btn.dataset.confirm !== '1') {
-          btn.dataset.confirm = '1';
-          btn.textContent = 'Sure?';
-          btn.style.color = 'var(--pico-del-color, #c0392b)';
-          setTimeout(() => {
-            if (btn.dataset.confirm === '1') {
-              btn.dataset.confirm = '';
-              btn.textContent = '×';
-              btn.style.color = '';
-            }
-          }, 3000);
-          return;
-        }
-        await mapStore.delete(btn.dataset.del!);
-        await this.render();
+    // Delete asks for confirmation in a dialog
+    const dialog = this.root.querySelector('wa-dialog')!;
+    let pendingDelete: string | null = null;
+    this.root.querySelectorAll<HTMLElement>('wa-button.del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pendingDelete = btn.dataset.del!;
+        document.getElementById('cm-delete-text')!.textContent =
+          `"${btn.dataset.name}" will be removed from this device. Exported .kmz files are not affected.`;
+        dialog.open = true;
       });
+    });
+    document.getElementById('cm-delete-confirm')!.addEventListener('click', async () => {
+      if (!pendingDelete) return;
+      await mapStore.delete(pendingDelete);
+      dialog.open = false;
+      await this.render();
     });
   }
 
@@ -111,7 +120,7 @@ export class MapLibrary {
       await this.render();
       this.openMap(overlay);
     } catch (err) {
-      showToast(`Failed to open KMZ: ${(err as Error).message}`, this.root);
+      showToast(`Failed to open KMZ: ${(err as Error).message}`);
     }
   }
 
@@ -123,12 +132,4 @@ export class MapLibrary {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function showToast(message: string, container: HTMLElement): void {
-  const t = document.createElement('div');
-  t.textContent = message;
-  t.style.cssText = 'position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem 1rem;border-radius:.5rem;font-size:.85rem;z-index:2000;max-width:90vw;text-align:center;';
-  container.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
 }

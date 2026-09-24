@@ -1,6 +1,8 @@
-import '@picocss/pico/css/pico.min.css';
+import './ui/webawesome';
 import 'leaflet/dist/leaflet.css';
+import './styles.css';
 import L from 'leaflet';
+import { followSystemColorScheme } from './ui/colorScheme';
 
 // Fix Leaflet default marker icons under Vite bundling
 // @ts-expect-error - _getIconUrl is an internal implementation detail
@@ -12,6 +14,8 @@ L.Icon.Default.mergeOptions({
 });
 
 import { MapLibrary } from './ui/MapLibrary';
+
+followSystemColorScheme();
 
 const root = document.getElementById('app')!;
 new MapLibrary(root).mount();

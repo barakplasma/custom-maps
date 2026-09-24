@@ -3,6 +3,8 @@ import { writeKmz } from '../../io/KmzWriter';
 import { mapStore } from '../../storage/MapStore';
 import type { Tiepoint } from '../../core/Tiepoint';
 import { ImagePointPicker } from './ImagePointPicker';
+import { showToast } from '../toast';
+import type WaButton from '@awesome.me/webawesome/dist/components/button/button.js';
 
 const MAX_TIEPOINTS = 2;
 
@@ -16,22 +18,17 @@ export class MapEditor {
   // Step A: pick image file
   private renderStepA(container: HTMLElement): void {
     container.innerHTML = `
-      <style>
-        #cm-editor { min-height: 100dvh; display: flex; flex-direction: column; }
-        #cm-editor nav { flex-shrink: 0; }
-        #cm-editor .step-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; }
-        #cm-editor input[type=file] { display: none; }
-      </style>
-      <div id="cm-editor">
-        <nav>
-          <ul><li><button id="cm-ed-back" class="outline">← Back</button></li></ul>
-          <ul><li><strong>Create Map — Step 1</strong></li></ul>
-        </nav>
-        <div class="step-body container">
-          <p>Select a map image (JPEG or PNG).</p>
-          <input type="file" id="cm-img-input" accept="image/jpeg,image/png,image/gif">
-          <button id="cm-pick-img">Choose image…</button>
-        </div>
+      <div id="cm-editor" class="app-screen">
+        ${appBar('New map', 'Step 1 of 3 · Choose an image')}
+        <main class="app-content wa-stack wa-gap-l wa-justify-content-center">
+          <input type="file" id="cm-img-input" class="hidden-input" accept="image/jpeg,image/png,image/gif,image/webp">
+          <div class="dropzone wa-stack wa-gap-s wa-align-items-center wa-text-center">
+            <wa-icon name="image-plus"></wa-icon>
+            <h2 class="wa-heading-m">Pick a map image</h2>
+            <p class="wa-body-s wa-color-text-quiet">A trail map, campus map, or photo of a paper map. JPEG, PNG, GIF or WebP.</p>
+            <wa-button id="cm-pick-img" variant="brand" size="l">Choose image…</wa-button>
+          </div>
+        </main>
       </div>`;
 
     document.getElementById('cm-ed-back')!.addEventListener('click', this.onDone);
@@ -76,62 +73,47 @@ export class MapEditor {
         leafletMap?.remove();
         leafletMap = null;
         container.innerHTML = `
-          <style>
-            #cm-editor { min-height: 100dvh; display: flex; flex-direction: column; }
-            #cm-editor nav { flex-shrink: 0; }
-            #cm-editor .save-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
-            #cm-editor .save-body label { width: 100%; max-width: 480px; }
-          </style>
-          <div id="cm-editor">
-            <nav>
-              <ul><li><button id="cm-ed-back" class="outline">← Back</button></li></ul>
-              <ul><li><strong>${n} tiepoints set</strong></li></ul>
-            </nav>
-            <div class="save-body container">
-              <p>All tiepoints confirmed. Give your map a name and save.</p>
-              <label>
-                Map name
-                <input type="text" id="cm-map-name" value="${escapeAttr(defaultName)}" placeholder="My map" autocomplete="off">
-              </label>
-              <button id="cm-save" style="width:100%;max-width:480px;">Save map</button>
-            </div>
+          <div id="cm-editor" class="app-screen">
+            ${appBar('New map', 'Step 3 of 3 · Name and save')}
+            <main class="app-content">
+              <div class="form-column wa-stack wa-gap-l save-body">
+                <wa-callout variant="success">
+                  <wa-icon slot="icon" name="check"></wa-icon>
+                  ${n} tiepoints set. Your map is ready.
+                </wa-callout>
+                <wa-input id="cm-map-name" label="Map name" value="${escapeAttr(defaultName)}" placeholder="My map" autocomplete="off" size="l"></wa-input>
+                <wa-button id="cm-save" variant="brand" size="l">
+                  <wa-icon slot="start" name="check"></wa-icon> Save map
+                </wa-button>
+                <p class="wa-body-s wa-color-text-quiet">Saves to this device and downloads a .kmz copy you can share.</p>
+              </div>
+            </main>
           </div>`;
 
         document.getElementById('cm-ed-back')!.addEventListener('click', () => this.renderStepA(container));
-        document.getElementById('cm-map-name')!.focus();
+        const nameEl = container.querySelector('wa-input')!;
         document.getElementById('cm-save')!.addEventListener('click', async () => {
-          const nameEl = document.getElementById('cm-map-name') as HTMLInputElement;
-          const name = nameEl.value.trim() || defaultName || 'My map';
+          const name = (nameEl.value ?? '').trim() || defaultName || 'My map';
           await this.save(container, image, imageBlob, imageFilename, name, tiepoints);
         });
+        // wa-input can only take focus once it has rendered its inner <input>
+        void nameEl.updateComplete.then(() => nameEl.focus());
         return;
       }
 
       container.innerHTML = `
-        <style>
-          #cm-editor { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-          #cm-editor nav { flex-shrink: 0; }
-          #cm-editor .split { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-          #cm-editor .split .img-half { flex: 1; position: relative; overflow: hidden; background: #111; }
-          #cm-editor .split .img-half canvas { width: 100%; height: 100%; display: block; }
-          #cm-editor .split .map-half { flex: 1; position: relative; overflow: hidden; }
-          #cm-editor .split .map-half > div { position: absolute; inset: 0; }
-          #cm-editor .controls { flex-shrink: 0; padding: .5rem 1rem; display: flex; gap: .5rem; align-items: center; background: var(--pico-background-color, #fff); border-top: 1px solid var(--pico-muted-border-color, #ddd); position: relative; z-index: 10; }
-          #cm-editor .status { flex: 1; font-size: .85rem; }
-        </style>
-        <div id="cm-editor">
-          <nav>
-            <ul><li><button id="cm-ed-back" class="outline">← Back</button></li></ul>
-            <ul><li><strong>Tiepoints: ${n}/${MAX_TIEPOINTS}</strong></li></ul>
-          </nav>
-          <div class="split">
-            <div class="img-half"><canvas id="cm-canvas"></canvas></div>
-            <div class="map-half"><div id="cm-leaflet"></div></div>
+        <div id="cm-editor" class="app-screen">
+          ${appBar('New map', `Step 2 of 3 · Tiepoint ${n + 1} of ${MAX_TIEPOINTS}`)}
+          <div class="editor-split">
+            <div class="editor-image"><canvas id="cm-canvas"></canvas></div>
+            <div class="editor-map"><div id="cm-leaflet"></div></div>
           </div>
-          <div class="controls">
-            <span class="status" id="cm-status">${statusText(n, pendingPixel, pendingGeo)}</span>
-            <button id="cm-confirm" ${canConfirm?'':'disabled'}>Confirm pair</button>
-          </div>
+          <footer class="action-bar wa-cluster wa-gap-s wa-align-items-center">
+            <span class="editor-status wa-body-s" id="cm-status">${statusText(n, pendingPixel, pendingGeo)}</span>
+            <wa-button id="cm-confirm" variant="brand" ${canConfirm ? '' : 'disabled'}>
+              <wa-icon slot="start" name="check"></wa-icon> Confirm
+            </wa-button>
+          </footer>
         </div>`;
 
       document.getElementById('cm-ed-back')!.addEventListener('click', () => {
@@ -169,19 +151,14 @@ export class MapEditor {
 
       document.getElementById('cm-confirm')!.addEventListener('click', () => {
         if (!pendingPixel || !pendingGeo) return;
-        try {
-          tiepoints.push({ xPixel: pendingPixel.x, yPixel: pendingPixel.y, lat: pendingGeo.lat, lon: pendingGeo.lon });
-          pendingPixel = null;
-          pendingGeo = null;
-          geoMarker?.remove();
-          geoMarker = null;
-          leafletMap?.remove();
-          leafletMap = null;
-          render();
-        } catch (err) {
-          const statusEl = document.getElementById('cm-status');
-          if (statusEl) statusEl.textContent = `Error: ${(err as Error).message}`;
-        }
+        tiepoints.push({ xPixel: pendingPixel.x, yPixel: pendingPixel.y, lat: pendingGeo.lat, lon: pendingGeo.lon });
+        pendingPixel = null;
+        pendingGeo = null;
+        geoMarker?.remove();
+        geoMarker = null;
+        leafletMap?.remove();
+        leafletMap = null;
+        render();
       });
     };
 
@@ -190,7 +167,7 @@ export class MapEditor {
       if (el) el.textContent = statusText(tiepoints.length, pendingPixel, pendingGeo);
     };
     const updateButtons = () => {
-      const confirm = document.getElementById('cm-confirm') as HTMLButtonElement|null;
+      const confirm = container.querySelector<WaButton>('#cm-confirm');
       if (confirm) confirm.disabled = !(pendingPixel && pendingGeo);
     };
 
@@ -206,8 +183,8 @@ export class MapEditor {
     tiepoints: Tiepoint[],
   ): Promise<void> {
     const safeFilename = imageFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const saveBtn = document.getElementById('cm-save') as HTMLButtonElement | null;
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+    const saveBtn = container.querySelector<WaButton>('#cm-save');
+    if (saveBtn) saveBtn.loading = true;
 
     try {
       const kmzBlob = await writeKmz({
@@ -235,14 +212,23 @@ export class MapEditor {
       this.onDone();
     } catch (err) {
       console.error('Save failed', err);
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save map'; }
-      // Show error inside the container instead of alert() which can be blocked
-      const errEl = document.createElement('p');
-      errEl.style.color = 'var(--pico-del-color, #c0392b)';
-      errEl.textContent = `Save failed: ${(err as Error).message}`;
-      container.querySelector('.save-body')?.appendChild(errEl);
+      if (saveBtn) saveBtn.loading = false;
+      showToast(`Save failed: ${(err as Error).message}`);
     }
   }
+}
+
+function appBar(title: string, subtitle: string): string {
+  return `
+    <header class="app-bar wa-cluster wa-gap-s wa-align-items-center">
+      <wa-button id="cm-ed-back" appearance="plain" size="l">
+        <wa-icon name="arrow-left" label="Back"></wa-icon>
+      </wa-button>
+      <div class="wa-stack wa-gap-3xs">
+        <h1 class="wa-heading-s">${title}</h1>
+        <span class="wa-caption-m wa-color-text-quiet">${subtitle}</span>
+      </div>
+    </header>`;
 }
 
 function escapeAttr(s: string): string {
@@ -254,11 +240,11 @@ function statusText(
   pixel: { x: number; y: number } | null,
   geo: { lat: number; lon: number } | null,
 ): string {
-  if (n >= MAX_TIEPOINTS) return `${n} tiepoints ready. Click Save.`;
-  if (!pixel && !geo) return `Tap on the image to pick point ${n+1}.`;
-  if (pixel && !geo)  return 'Now click the same spot on the map.';
+  if (n >= MAX_TIEPOINTS) return `${n} tiepoints ready.`;
+  if (!pixel && !geo) return 'Tap a spot on the image you can also find on the map.';
+  if (pixel && !geo)  return 'Now tap the same spot on the map below.';
   if (!pixel && geo)  return 'Got map point. Tap image to match it.';
-  return 'Both picked. Tap Confirm.';
+  return 'Both points picked. Tap Confirm.';
 }
 
 function loadImage(blob: Blob): Promise<HTMLImageElement> {
