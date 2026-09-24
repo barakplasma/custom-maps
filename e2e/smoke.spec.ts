@@ -102,8 +102,8 @@ test('sharing sends the .kmz with a message linking to the app', async ({ page }
   await page.reload();
   await mapAction(page, 'E2E Test Map', 'Share');
 
-  const shared = await page.evaluate(() => (window as unknown as { shared: unknown }).shared);
-  expect(shared).toEqual({
+  // Sharing reads the stored map first, so wait for it to reach the share sheet
+  await expect.poll(() => page.evaluate(() => (window as unknown as { shared: unknown }).shared)).toEqual({
     title: 'E2E Test Map',
     text: expect.stringMatching(/^"E2E Test Map" is a map for Custom Maps\..*\nhttp:\/\/localhost:4173\/$/s),
     files: ['E2E_Test_Map.kmz application/vnd.google-earth.kmz'],

@@ -79,13 +79,11 @@ test.describe('navigating with a map', () => {
 
   test('shows a compass heading on the location dot', async ({ page, browserName }) => {
     const ios = browserName === 'webkit';
-    if (ios) {
-      // iOS asks for compass permission on the tap; the test grants it
-      await page.addInitScript(() => {
-        (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission =
-          () => Promise.resolve('granted');
-      });
-    }
+    // iOS (and Chrome 153+) ask for compass permission on the tap; the test grants it
+    await page.addInitScript(() => {
+      (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission =
+        () => Promise.resolve('granted');
+    });
     await openRotatedMap(page);
     await page.getByRole('button', { name: 'Show my location' }).click();
     // Android Chrome: absolute alpha via deviceorientationabsolute. iOS: webkitCompassHeading.
