@@ -204,15 +204,18 @@ src/ui/
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
   DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
   MapLibrary.ts            — IndexedDB-backed map list
+  LocateControl.ts         — Leaflet control (wa-button) centring the map on the user
+  webawesome.ts            — component registration + bundled icon list
+  colorScheme.ts / toast.ts
   editor/
     MapEditor.ts           — wizard orchestrator
-    ImagePointPicker.ts    — pannable canvas, click to pick pixel
+    ImagePointPicker.ts    — canvas with drag, pinch and wheel zoom; tap to pick pixel
     GeoPointPicker.ts      — Leaflet map, click to pick lat/lon             (planned)
     MapPreview.ts          — image warped over Leaflet for alignment check  (planned)
 
 src/storage/
   MapStore.ts              — IndexedDB wrapper for KMZ blobs
-  Prefs.ts                 — localStorage wrapper for settings              (planned)
+  Prefs.ts                 — localStorage wrapper for settings (last editor map view)
 ```
 
 Files marked *(planned)* do not exist yet. Known gaps vs. this spec: `GeoToImageConverter`
@@ -236,6 +239,15 @@ read `gx:LatLonQuad`.
 ---
 
 ## UI / Styling Rules
+
+**Priorities, in order:**
+1. **Mobile usability comes first.** Thumb-reachable controls, 44 px tap targets, safe-area
+   insets, pinch/pan that works with fingers. Custom CSS is fine when it makes mobile work better.
+2. **Lean on the component library.** Use a Web Awesome component, layout utility
+   (`wa-stack`, `wa-cluster`, `wa-flank`, `wa-grid`, `wa-list-plain`) or text/color utility before
+   writing any CSS. Use HTML attributes (`hidden`, `disabled`) over classes.
+3. **Write as little custom CSS as possible.** Every rule in `src/styles.css` should say why the
+   library can't do it. Before adding one, check whether an existing rule or utility covers it.
 
 The UI uses **Web Awesome** (`@awesome.me/webawesome`). Its package ships agent-oriented docs:
 `node_modules/@awesome.me/webawesome/dist/skills/webawesome/references/components/<name>.md` (component
@@ -276,7 +288,8 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - Do not use the Google Maps API anywhere.
 - Do not use single-precision floats for coordinate math.
 - Do not store binary data in localStorage.
-- Call `watchPosition` and `requestPermission` only in response to a user gesture.
+- Call `watchPosition`, `getCurrentPosition` and `requestPermission` only in response to a user
+  gesture — or after `geolocationAlreadyGranted()` confirms no prompt will appear.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
   `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `src/io/Kml.test.ts` guards it).
 - No external requests except OSM tile servers and optional user-provided KMZ URLs.

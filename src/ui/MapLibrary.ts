@@ -24,16 +24,16 @@ export class MapLibrary {
           </h1>
         </header>
         <main class="app-content">
-          <input type="file" id="cm-file-input" class="hidden-input" accept=".kmz">
+          <input type="file" id="cm-file-input" accept=".kmz" hidden>
           ${maps.length === 0
-            ? `<div class="empty-state wa-stack wa-gap-s wa-align-items-center wa-text-center">
-                 <wa-icon name="map-pin"></wa-icon>
+            ? `<div class="wa-stack wa-gap-s wa-align-items-center wa-text-center">
+                 <wa-icon name="map-pin" class="wa-font-size-4xl wa-color-text-quiet"></wa-icon>
                  <h2 class="wa-heading-m">No maps yet</h2>
                  <p class="wa-body-m wa-color-text-quiet">Open a .kmz file, or turn any map image into a GPS map.</p>
                </div>`
-            : `<ul class="map-list">
+            : `<ul class="map-list wa-list-plain">
                 ${maps.map(m => `
-                  <li class="wa-cluster wa-gap-2xs wa-align-items-center">
+                  <li class="wa-flank:end wa-gap-2xs wa-align-items-center">
                     <wa-button class="open" appearance="plain" size="l" data-id="${m.id}">
                       <wa-icon slot="start" name="map"></wa-icon>
                       ${escapeHtml(m.name)}
@@ -42,11 +42,12 @@ export class MapLibrary {
                     <wa-button class="del" appearance="plain" variant="danger" size="l" data-del="${m.id}" data-name="${escapeHtml(m.name)}">
                       <wa-icon name="trash-2" label="Delete ${escapeHtml(m.name)}"></wa-icon>
                     </wa-button>
-                  </li>`).join('')}
+                  </li>
+                  <wa-divider></wa-divider>`).join('')}
                </ul>`
           }
         </main>
-        <footer class="action-bar even wa-cluster wa-gap-s">
+        <footer class="action-bar wa-grid wa-gap-s" style="--min-column-size: 8rem">
           <wa-button id="cm-import" appearance="outlined">
             <wa-icon slot="start" name="folder-open"></wa-icon> Open file
           </wa-button>

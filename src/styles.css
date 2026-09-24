@@ -1,80 +1,63 @@
-/* App-level styles. Built on Web Awesome tokens so light/dark and theming apply automatically. */
+/* App-level CSS. Prefer Web Awesome components and utility classes; rules here exist only
+   where the library has no equivalent — mostly mobile layout and Leaflet integration. */
 
 html, body { height: 100%; margin: 0; }
-body { background: var(--wa-color-surface-default); }
+
+/* Native styles give form controls a display value, which would override the hidden attribute. */
+[hidden] { display: none !important; }
 
 /* Let taps on a button's icon land on the button itself. */
 wa-button > wa-icon { pointer-events: none; }
 
-/* A full-height screen: sticky app bar, scrolling content, sticky bottom action bar. */
-.app-screen {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-.app-bar {
+/* Full-height screen with a sticky header and a sticky bottom action bar within thumb reach.
+   (<wa-page> has no sticky bottom region, so this stays custom.) */
+.app-screen { min-height: 100dvh; display: flex; flex-direction: column; }
+.app-bar,
+.action-bar {
   position: sticky;
-  top: 0;
   z-index: 10;
   padding: var(--wa-space-s) var(--wa-space-m);
-  padding-top: max(var(--wa-space-s), env(safe-area-inset-top));
   background: var(--wa-color-surface-default);
+}
+.app-bar {
+  top: 0;
+  padding-top: max(var(--wa-space-s), env(safe-area-inset-top));
   border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
 }
 .app-bar h1 { margin: 0; }
 .app-content { flex: 1; padding: var(--wa-space-m); }
 .action-bar {
-  position: sticky;
   bottom: 0;
-  z-index: 10;
-  padding: var(--wa-space-s) var(--wa-space-m);
   padding-bottom: max(var(--wa-space-s), env(safe-area-inset-bottom));
-  background: var(--wa-color-surface-default);
   border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
 }
-.action-bar.even { flex-wrap: nowrap; }
-.action-bar.even > wa-button { flex: 1 1 0; min-width: 0; }
 
-/* Map library list */
-.map-list { margin: 0; padding: 0; list-style: none; }
-.map-list li { border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border); }
-.map-list .open { flex: 1; min-width: 0; }
+/* Map list rows: left-aligned name with the chevron at the far edge, long names truncated. */
 .map-list .open::part(base) { justify-content: flex-start; }
 .map-list .open::part(label) { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empty-state { padding-block: var(--wa-space-3xl); }
-.empty-state > wa-icon { font-size: var(--wa-font-size-4xl); color: var(--wa-color-text-quiet); }
 
-/* Controls floating over the full-screen map */
+/* Controls floating over the full-screen map (clear of notches and home indicators). */
 .map-fullscreen { position: fixed; inset: 0; }
-.float-top-start {
-  position: fixed;
-  z-index: 1000;
-  top: max(var(--wa-space-m), env(safe-area-inset-top));
-  left: var(--wa-space-m);
-}
+.float-top-start,
 .float-bottom-end {
   position: fixed;
   z-index: 1000;
+  box-shadow: var(--wa-shadow-m);
+  border-radius: var(--wa-border-radius-pill);
+}
+.float-top-start { top: max(var(--wa-space-m), env(safe-area-inset-top)); left: var(--wa-space-m); }
+.float-bottom-end {
   bottom: max(var(--wa-space-xl), calc(env(safe-area-inset-bottom) + var(--wa-space-s)));
   right: var(--wa-space-m);
 }
-.float-top-start, .float-bottom-end { box-shadow: var(--wa-shadow-m); border-radius: var(--wa-border-radius-pill); }
 
-/* Map editor */
+/* Map editor: image on top, map below, splitting the space between header and action bar. */
 .editor-split { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .editor-split > * { flex: 1; position: relative; overflow: hidden; min-height: 0; }
 .editor-image { background: var(--wa-color-surface-lowered); }
-.editor-image canvas { width: 100%; height: 100%; display: block; }
+/* touch-action: none lets the picker handle one-finger pan and two-finger pinch itself. */
+.editor-image canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 .editor-map > div { position: absolute; inset: 0; }
-.editor-status { flex: 1; min-width: 0; }
-.dropzone {
-  border: var(--wa-border-width-m) dashed var(--wa-color-surface-border);
-  border-radius: var(--wa-border-radius-l);
-  padding: var(--wa-space-2xl) var(--wa-space-l);
-}
-.dropzone > wa-icon { font-size: var(--wa-font-size-4xl); color: var(--wa-color-brand-fill-loud); }
-.form-column { width: 100%; max-width: 30rem; margin-inline: auto; }
-.hidden-input { display: none; }
 
 /* ---- Leaflet, themed to match ---- */
 .leaflet-container { font: inherit; background: var(--wa-color-surface-lowered); }
@@ -89,6 +72,7 @@ wa-button > wa-icon { pointer-events: none; }
   color: var(--wa-color-text-quiet);
 }
 .leaflet-control-attribution a { color: var(--wa-color-text-link); }
+.leaflet-control > wa-button { box-shadow: var(--wa-shadow-m); border-radius: var(--wa-border-radius-pill); }
 
 /* Dark mode: OSM only serves light tiles, so invert them into a dark basemap.
    Only the tile pane is filtered — the user's map image and GPS layers keep true colours. */

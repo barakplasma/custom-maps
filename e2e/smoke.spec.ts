@@ -43,6 +43,7 @@ test('library screen renders with no JS errors', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open file' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create map' })).toBeVisible();
+  await expect(page.locator('#cm-file-input')).toBeHidden();
   expect(errors).toEqual([]);
 });
 

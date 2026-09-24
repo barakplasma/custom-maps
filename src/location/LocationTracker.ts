@@ -31,3 +31,31 @@ export class LocationTracker {
     }
   }
 }
+
+// One-shot position fix. Only call from a user gesture, or after
+// geolocationAlreadyGranted() resolves true (then no prompt is shown).
+// maxAgeMs defaults to 0: a tap on "locate" must reflect where the user is now, not a cached fix.
+export function getCurrentLocation(maxAgeMs = 0): Promise<LocationUpdate> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      err => reject(new Error(err.message || 'Location unavailable')),
+      { enableHighAccuracy: true, maximumAge: maxAgeMs, timeout: 10_000 },
+    );
+  });
+}
+
+// True when the user has already allowed location for this site, so reading it
+// will not show a permission prompt. Safari < 16 has no Permissions API → false.
+export async function geolocationAlreadyGranted(): Promise<boolean> {
+  try {
+    const status = await navigator.permissions?.query({ name: 'geolocation' });
+    return status?.state === 'granted';
+  } catch {
+    return false;
+  }
+}
