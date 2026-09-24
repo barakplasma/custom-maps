@@ -75,6 +75,6 @@ Instead of `<LatLonBox>` the Android app could write
 | `<GroundOverlay>` may sit directly under `<kml>` or inside `<Document>`/`<Folder>` | Both parsers accept either |
 | Always **write** tiepoints; always **read** tiepoints *and* `LatLonBox` | Tiepoints are exact; `LatLonBox` is for Google Earth and other KML readers |
 
-The web implementation lives in `web/src/io/KmzWriter.ts` (`buildKml`) and
-`web/src/io/KmzReader.ts` (`parseKml`). `web/src/io/Kml.test.ts` contains an Android-format
+The web implementation lives in `src/io/KmzWriter.ts` (`buildKml`) and
+`src/io/KmzReader.ts` (`parseKml`). `src/io/Kml.test.ts` contains an Android-format
 fixture — keep it passing.

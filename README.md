@@ -43,5 +43,5 @@ history.
 
 ## License
 
-Apache 2.0 — see [`COPYING`](COPYING). `web/src/core/DMatrix.ts` is additionally covered by
+Apache 2.0 — see [`COPYING`](COPYING). `src/core/DMatrix.ts` is additionally covered by
 [`Skia-LICENSE.txt`](Skia-LICENSE.txt).

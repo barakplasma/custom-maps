@@ -54,7 +54,7 @@ Workflow for changes:
 1. **Pure logic** (`core/`, KML parsing/building in `io/`): write or extend a `*.test.ts` next to
    the file. `core/` tests run in Node; files touching `DOMParser` use
    `// @vitest-environment jsdom` (not happy-dom — it rejects CDATA, which Android KMLs use).
-2. **UI changes**: add or extend a spec in `web/e2e/`. Tests must be hermetic — stub
+2. **UI changes**: add or extend a spec in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
    375×740 and look at it, rather than guessing from the DOM.
@@ -179,22 +179,22 @@ Show an "Enable compass" button; do not request on page load.
 ## Source File Conventions
 
 ```
-web/src/core/
+src/core/
   GeoToImageConverter.ts   — affine transform, tiepoint fitting
   DMatrix.ts               — double-precision 3×3 matrix (determinant, inverse, multiply)
   GroundOverlay.ts         — data model for a georeferenced map
   Tiepoint.ts              — Tiepoint interface + helpers
   GeoidHeight.ts           — EGM96 lookup                                   (planned)
 
-web/src/io/
+src/io/
   KmzReader.ts             — JSZip + DOMParser → GroundOverlay + image Blob (parseKml is pure)
   KmzWriter.ts             — GroundOverlay + image Blob → JSZip Blob (buildKml is pure)
 
-web/src/location/
+src/location/
   LocationTracker.ts       — watchPosition wrapper, emits LocationUpdate events
   CompassTracker.ts        — deviceorientation wrapper, emits heading degrees (planned)
 
-web/src/ui/
+src/ui/
   MapView.ts               — main map page, Leaflet map + canvas image overlay
   LocationLayer.ts         — GPS dot, accuracy circle, heading arrow
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
@@ -206,7 +206,7 @@ web/src/ui/
     GeoPointPicker.ts      — Leaflet map, click to pick lat/lon             (planned)
     MapPreview.ts          — image warped over Leaflet for alignment check  (planned)
 
-web/src/storage/
+src/storage/
   MapStore.ts              — IndexedDB wrapper for KMZ blobs
   Prefs.ts                 — localStorage wrapper for settings              (planned)
 ```
@@ -260,7 +260,7 @@ The UI uses **Pico.css** (classless). Follow these rules:
 - Do not store binary data in localStorage.
 - Call `watchPosition` and `requestPermission` only in response to a user gesture.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
-  `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `web/src/io/Kml.test.ts` guards it).
+  `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `src/io/Kml.test.ts` guards it).
 - No external requests except OSM tile servers and optional user-provided KMZ URLs.
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
 - Every change ships with a test (unit or e2e) and `npm run check` passing.
