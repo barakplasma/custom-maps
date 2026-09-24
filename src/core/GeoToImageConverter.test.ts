@@ -40,7 +40,38 @@ describe('GeoToImageConverter', () => {
     const conv = new GeoToImageConverter();
     conv.setFromTiepoints(tiepoints);
     const [lat, lon] = conv.imageToLatLon(500, 400);
-    expect(lat).toBeCloseTo(32.075, 9);
+    // Mercator spaces latitudes slightly non-linearly: within ~1 m of the linear midpoint
+    expect(lat).toBeCloseTo(32.075, 5);
     expect(lon).toBeCloseTo(34.775, 9);
+  });
+});
+
+describe('GeoToImageConverter with 2 tiepoints (the wizard default)', () => {
+  // A north-up image of a 1 km × 1 km area in Oslo (lat 60, where a degree of longitude is
+  // half as long as a degree of latitude). 1000 × 1000 px, so 1 px ≈ 1 m in both directions.
+  const lat0 = 59.9, lon0 = 10.7;
+  const dLat = 1000 / 111_320;                               // 1 km north
+  const dLon = 1000 / (111_320 * Math.cos((lat0 * Math.PI) / 180)); // 1 km east
+  const topLeft = { xPixel: 0, yPixel: 0, lat: lat0 + dLat, lon: lon0 };
+  const bottomRight = { xPixel: 1000, yPixel: 1000, lat: lat0, lon: lon0 + dLon };
+
+  it('keeps the image upright and unmirrored: the other corners land in the right places', () => {
+    const conv = new GeoToImageConverter();
+    expect(conv.setFromTiepoints([topLeft, bottomRight])).toBe(true);
+    const [trLat, trLon] = conv.imageToLatLon(1000, 0); // top-right corner: north-east
+    const [blLat, blLon] = conv.imageToLatLon(0, 1000); // bottom-left corner: south-west
+    expect(trLat).toBeCloseTo(topLeft.lat, 5);
+    expect(trLon).toBeCloseTo(bottomRight.lon, 5);
+    expect(blLat).toBeCloseTo(bottomRight.lat, 5);
+    expect(blLon).toBeCloseTo(topLeft.lon, 5);
+  });
+
+  it('round-trips through the inverse', () => {
+    const conv = new GeoToImageConverter();
+    conv.setFromTiepoints([topLeft, bottomRight]);
+    const [lat, lon] = conv.imageToLatLon(250, 750);
+    const [x, y] = conv.latLonToImage(lat, lon);
+    expect(x).toBeCloseTo(250, 6);
+    expect(y).toBeCloseTo(750, 6);
   });
 });

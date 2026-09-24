@@ -47,7 +47,7 @@ All commands run from the repo root:
 npm run dev          # dev server on :5173
 npm run typecheck    # tsc --noEmit
 npm test             # Vitest unit tests: src/**/*.test.ts (fast, run often)
-npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 7) + iPhone Safari (WebKit, iPhone SE 375 px)
+npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 10, 360 px) + iPhone Safari (WebKit, iPhone SE 375 px)
 npm run check        # everything — must pass before pushing
 ```
 
@@ -59,7 +59,7 @@ Workflow for changes:
 2. **UI changes**: add or extend a spec in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
-   375×740 and look at it, rather than guessing from the DOM — in **both** color schemes
+   the Pixel 10 profile (`devices['Pixel 10']`, 360×732) and look at it, rather than guessing from the DOM — in **both** color schemes
    (`browser.newContext({ colorScheme: 'dark' })`). Leaflet `flyTo` animations can take several
    seconds; wait before judging map screenshots.
 4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
@@ -126,6 +126,10 @@ Given N ≥ 2 tiepoints, fit a 3×3 affine matrix `A` (double precision):
 - 4+ tiepoints → least squares
 
 Always invert `A` to get `A⁻¹` for the reverse direction (geo → pixel), used to place the GPS dot.
+
+**Fit in Web Mercator, not raw degrees** (`GeoToImageConverter`, as the Android editor did).
+Mercator is conformal and y-down like image rows; in raw lat/lon a 2-tiepoint fit comes out
+mirrored and squashed by cos(lat). Tiepoints are still stored as lat/lon.
 
 **Use `number` (64-bit float) everywhere. Never use `Float32Array` — precision loss corrupts
 georeferencing.**
@@ -299,7 +303,7 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - Primary action bar at the bottom (within thumb reach).
 - Minimum tap target: 44×44 px.
 - `font-size` in `rem` only; never `px` for text.
-- Test every screen in 375 px wide portrait — that is the baseline.
+- Test every screen at 360 px wide portrait (Pixel 10, the owner's phone) — that is the baseline.
 
 ---
 

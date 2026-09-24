@@ -163,6 +163,7 @@ class RotatedImageLayer extends L.Layer {
     this.leafletMap = map;
     const pane = map.getPane('overlayPane')!;
     this.img = document.createElement('img');
+    this.img.className = 'leaflet-image-layer'; // Leaflet's CSS exempts this class from img { max-width: 100% }
     this.img.src = this.url;
     this.img.style.cssText = `position:absolute;transform-origin:0 0;opacity:0.75;width:${this.w}px;height:${this.h}px;`;
     this.img.draggable = false;
@@ -185,10 +186,10 @@ class RotatedImageLayer extends L.Layer {
     const map = this.leafletMap;
     const w = this.w, h = this.h;
 
-    // Map image corners to container pixels
-    const p00 = toContainerPt(map, this.conv, 0,   0  );
-    const p10 = toContainerPt(map, this.conv, w,   0  );
-    const p01 = toContainerPt(map, this.conv, 0,   h  );
+    // Map image corners to overlay-pane pixels
+    const p00 = toLayerPt(map, this.conv, 0,   0  );
+    const p10 = toLayerPt(map, this.conv, w,   0  );
+    const p01 = toLayerPt(map, this.conv, 0,   h  );
 
     // CSS matrix(a,b,c,d,e,f) transform
     const a = (p10.x - p00.x) / w;
@@ -202,7 +203,9 @@ class RotatedImageLayer extends L.Layer {
   }
 }
 
-function toContainerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
+// Pane-relative position. The overlay pane is itself translated while the map pans, so
+// container points would apply the pan offset twice and the image would slide off the map.
+function toLayerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
   const [lat, lon] = conv.imageToLatLon(x, y);
-  return map.latLngToContainerPoint([lat, lon]);
+  return map.latLngToLayerPoint([lat, lon]);
 }

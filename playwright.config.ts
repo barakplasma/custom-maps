@@ -24,7 +24,7 @@ export default defineConfig({
     {
       name: 'android-chrome',
       use: {
-        ...devices['Pixel 7'],
+        ...devices['Pixel 10'],
         launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE },
       },
     },
