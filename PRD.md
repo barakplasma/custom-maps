@@ -221,8 +221,9 @@ single-precision causes visible positioning errors.
 
 ## Local-First & Open Source Requirements
 
-- Zero telemetry, zero analytics, zero external requests except OSM tile servers and optional
-  user-provided KMZ URLs.
+- No third-party telemetry and no external requests except OSM tile servers and optional
+  user-provided KMZ URLs. The hosted site uses Vercel Web Analytics and Speed Insights
+  (cookieless, same-origin `/_vercel/*`, page views and Web Vitals only — never map data).
 - All code is MIT or compatible open source; document the licence of every dependency in a
   `LICENCES.md` or the `package.json` licence field.
 - No login, no account, no cloud sync. Every feature works 100% offline after installation.

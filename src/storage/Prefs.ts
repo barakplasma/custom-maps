@@ -30,6 +30,27 @@ export function setEditorView(view: MapViewPref, storage: Storage | undefined = 
   }
 }
 
+const OPACITY_KEY = 'cm.overlayOpacity';
+export const DEFAULT_OVERLAY_OPACITY = 0.75;
+
+// Opacity of the user's map image over the basemap, 0.1–1.
+export function getOverlayOpacity(storage: Storage | undefined = safeLocalStorage()): number {
+  try {
+    const v = Number(storage?.getItem(OPACITY_KEY));
+    return v >= 0.1 && v <= 1 ? v : DEFAULT_OVERLAY_OPACITY;
+  } catch {
+    return DEFAULT_OVERLAY_OPACITY;
+  }
+}
+
+export function setOverlayOpacity(opacity: number, storage: Storage | undefined = safeLocalStorage()): void {
+  try {
+    storage?.setItem(OPACITY_KEY, String(opacity));
+  } catch {
+    // Not remembering the preference is fine.
+  }
+}
+
 function isFiniteNum(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }

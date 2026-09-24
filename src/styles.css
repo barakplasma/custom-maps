@@ -40,18 +40,13 @@ wa-button > wa-icon { pointer-events: none; }
 
 /* Controls floating over the full-screen map (clear of notches and home indicators). */
 .map-fullscreen { position: fixed; inset: 0; }
-.float-top-start,
-.float-bottom-end {
+.float-top-start {
   position: fixed;
   z-index: 1000;
-  box-shadow: var(--wa-shadow-m);
-  border-radius: var(--wa-border-radius-pill);
+  top: max(var(--wa-space-m), env(safe-area-inset-top));
+  left: var(--wa-space-m);
 }
-.float-top-start { top: max(var(--wa-space-m), env(safe-area-inset-top)); left: var(--wa-space-m); }
-.float-bottom-end {
-  bottom: max(var(--wa-space-xl), calc(env(safe-area-inset-bottom) + var(--wa-space-s)));
-  right: var(--wa-space-m);
-}
+.float-top-start > wa-button { box-shadow: var(--wa-shadow-m); border-radius: var(--wa-border-radius-pill); }
 
 /* Map editor: image on top, map below, splitting the space between header and action bar.
    The screen is exactly one viewport tall, and the canvas and map are absolutely positioned,
@@ -65,6 +60,8 @@ wa-button > wa-icon { pointer-events: none; }
 .editor-map > div { position: absolute; inset: 0; }
 
 /* ---- Leaflet, themed to match ---- */
+/* Leaflet's touch buttons (zoom, locate) are 30 px; phones need 44 px tap targets. */
+.leaflet-touch .leaflet-bar a { width: 2.75rem; height: 2.75rem; line-height: 2.75rem; }
 .leaflet-container { font: inherit; background: var(--wa-color-surface-lowered); }
 .leaflet-bar a,
 .leaflet-bar a:hover {

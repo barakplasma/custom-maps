@@ -23,8 +23,12 @@ async function rotatedKmz(): Promise<Buffer> {
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
-async function openRotatedMap(page: Page) {
-  await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: PNG }));
+// Opens the rotated map; stub OSM tiles are served and their z/x/y recorded into `tiles`.
+async function openRotatedMap(page: Page, tiles: string[] = []) {
+  await page.route('https://tile.openstreetmap.org/**', (r) => {
+    tiles.push(new URL(r.request().url()).pathname.slice(1).replace('.png', ''));
+    return r.fulfill({ contentType: 'image/png', body: PNG });
+  });
   await page.goto('/');
   await page.locator('#cm-file-input').setInputFiles({ name: 'rotated.kmz', mimeType: 'application/vnd.google-earth.kmz', buffer: await rotatedKmz() });
   const img = page.locator('.leaflet-overlay-pane img');
@@ -67,4 +71,62 @@ test('the map image stays attached to the map while panning', async ({ page }) =
       imageFollowed: Math.abs(imgMoved.x - mapMoved.x) < 1 && Math.abs(imgMoved.y - mapMoved.y) < 1,
     };
   }, { timeout: 8000 }).toEqual({ mapMoved: true, imageFollowed: true });
+});
+
+test.describe('navigating with a map', () => {
+  const HERE = { latitude: 32.08, longitude: 34.785 };
+  test.use({ geolocation: HERE, permissions: ['geolocation'] });
+
+  test('shows a compass heading on the location dot', async ({ page, browserName }) => {
+    const ios = browserName === 'webkit';
+    if (ios) {
+      // iOS asks for compass permission on the tap; the test grants it
+      await page.addInitScript(() => {
+        (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission =
+          () => Promise.resolve('granted');
+      });
+    }
+    await openRotatedMap(page);
+    await page.getByRole('button', { name: 'Show my location' }).click();
+    // Android Chrome: absolute alpha via deviceorientationabsolute. iOS: webkitCompassHeading.
+    await expect(async () => {
+      await page.evaluate((isIos) => window.dispatchEvent(isIos
+        ? Object.assign(new Event('deviceorientation'), { alpha: 0, webkitCompassHeading: 60, webkitCompassAccuracy: 10 })
+        : Object.assign(new Event('deviceorientationabsolute'), { alpha: 300, beta: 0, gamma: 0, absolute: true })), ios);
+      await expect(page.locator('.leaflet-control-locate-heading')).toBeAttached({ timeout: 500 });
+    }).toPass();
+  });
+
+  test('keeps following the user as they walk', async ({ page, context }) => {
+    const tiles: string[] = [];
+    await openRotatedMap(page, tiles);
+    await page.getByRole('button', { name: 'Show my location' }).click();
+    await page.waitForTimeout(1000);
+
+    // Walk ~2 km north-east: the map must follow (at whatever zoom it is) without any tap
+    tiles.length = 0;
+    const there = { latitude: 32.095, longitude: 34.80 };
+    await context.setGeolocation(there);
+    const tileAt = (z: number) => {
+      const n = 2 ** z, rad = (there.latitude * Math.PI) / 180;
+      return `${z}/${Math.floor(((there.longitude + 180) / 360) * n)}/${Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * n)}`;
+    };
+    await expect.poll(() => tiles.some((t) => t === tileAt(Number(t.split('/')[0]))), { timeout: 10_000 }).toBe(true);
+    await expect(page.locator('.leaflet-control-locate')).toHaveClass(/following/);
+  });
+
+  test('map image transparency can be adjusted and is remembered', async ({ page }) => {
+    const img = await openRotatedMap(page);
+    await expect(img).toHaveCSS('opacity', '0.75');
+    await page.getByRole('button', { name: 'Map image transparency' }).click();
+    const slider = page.getByRole('slider', { name: 'Map image opacity' });
+    await slider.focus();
+    for (let i = 0; i < 5; i++) await slider.press('ArrowLeft'); // 5 × 0.05
+    await expect(img).toHaveCSS('opacity', '0.5');
+    await page.keyboard.press('Escape');
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Rotated', exact: true }).click();
+    await expect(page.locator('.leaflet-overlay-pane img')).toHaveCSS('opacity', '0.5');
+  });
 });

@@ -6,9 +6,17 @@ import { VitePWA } from 'vite-plugin-pwa';
 // already matches current Android and iOS browsers, so no target is configured here.
 export default defineConfig({
   base: './',
+  define: {
+    // Link used in share messages: the production site, even when shared from a preview build.
+    // Vercel provides the production domain at build time; locally the current site is used.
+    __APP_URL__: JSON.stringify(
+      process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/` : '',
+    ),
+  },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // registered in src/main.ts so updates reload the page
       // Icons, favicon and apple-touch-icon are generated from one SVG and injected into index.html
       pwaAssets: { image: 'public/icon.svg', preset: 'minimal-2023', overrideManifestIcons: true, injectThemeColor: false },
       manifest: {
@@ -22,6 +30,10 @@ export default defineConfig({
         scope: './',
       },
       workbox: {
+        // Activate a new version straight away (with registerSW in main.ts reloading the page);
+        // without these the update waits until every tab of the app has been closed.
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,dac}'],
         runtimeCaching: [
           {

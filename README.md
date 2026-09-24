@@ -8,7 +8,7 @@ Built for current Android and iOS browsers. Install it to your home screen ("Add
 Screen" / "Install app") and it works offline, keeps the screen on while tracking, and follows
 your device's light/dark setting.
 
-Local-first: no server, no account, no analytics. Maps are stored in your browser (IndexedDB) and
+Local-first: no server, no account, no tracking cookies (only anonymous, cookieless Vercel Web Analytics page views). Maps are stored in your browser (IndexedDB) and
 can be exported as `.kmz` files that are compatible with Google Earth and the original Custom Maps
 Android app.
 

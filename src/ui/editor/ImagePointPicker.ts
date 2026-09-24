@@ -8,6 +8,7 @@ export class ImagePointPicker {
   private tx = 0;
   private ty = 0;
   private confirmed: { x: number; y: number }[] = [];
+  private guides: { x: number; y: number }[] = [];
   private pending: { x: number; y: number } | null = null;
   private onPickCb: ((x: number, y: number) => void) | null = null;
   private pointers = new Map<number, { x: number; y: number }>();
@@ -32,6 +33,12 @@ export class ImagePointPicker {
   // The point being chosen; replaced by each new tap until confirmed.
   setPending(x: number, y: number): void {
     this.pending = { x, y };
+    this.draw();
+  }
+
+  // Previous tiepoints shown as grey guides while re-placing them.
+  setGuides(points: { x: number; y: number }[]): void {
+    this.guides = points;
     this.draw();
   }
 
@@ -69,6 +76,7 @@ export class ImagePointPicker {
     ctx.drawImage(this.image, 0, 0);
     ctx.lineWidth = 2 / this.scale;
     const r = 9 / this.scale;
+    for (const p of this.guides) this.drawMark(p, r, '#9ca3af');
     for (const p of this.confirmed) this.drawMark(p, r, '#16a34a');
     if (this.pending) this.drawMark(this.pending, r, '#dc2626');
     ctx.restore();
