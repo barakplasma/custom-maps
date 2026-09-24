@@ -21,13 +21,52 @@ custom-maps/
 │   │   ├── location/        ← geolocation + compass
 │   │   ├── ui/              ← Leaflet layers, panels, editor wizard
 │   │   └── storage/         ← IndexedDB + localStorage wrappers
+│   ├── e2e/                 ← Playwright smoke tests
 │   ├── public/
 │   │   └── EGM96Geoid1deg.dac  ← geoid grid asset (~130 KB)
 │   └── index.html
-├── app/                     ← original Android source (reference only)
+├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
+├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
+├── .claude/                 ← SessionStart hook: installs web deps in cloud sessions
 ├── PRD.md
 └── CLAUDE.md
 ```
+
+The original Android app was removed; it is in git history only. Its KMZ schema is preserved in
+`docs/KMZ_FORMAT.md`.
+
+---
+
+## Build, Test, Verify
+
+All commands run from `web/`:
+
+```sh
+npm run dev          # dev server on :5173
+npm run typecheck    # tsc --noEmit
+npm test             # Vitest unit tests: src/**/*.test.ts (fast, run often)
+npm run test:e2e     # Playwright: builds, serves on :4173, drives Chromium at 375 px
+npm run check        # everything — must pass before pushing
+```
+
+Workflow for changes:
+
+1. **Pure logic** (`core/`, KML parsing/building in `io/`): write or extend a `*.test.ts` next to
+   the file. `core/` tests run in Node; files touching `DOMParser` use
+   `// @vitest-environment jsdom` (not happy-dom — it rejects CDATA, which Android KMLs use).
+2. **UI changes**: add or extend a spec in `web/e2e/`. Tests must be hermetic — stub
+   `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
+3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
+   375×740 and look at it, rather than guessing from the DOM.
+4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
+   so they can be unit tested without a browser.
+
+In Claude Code on the web, Chromium is preinstalled and the SessionStart hook runs
+`npm install`, so every command above works immediately. Elsewhere, run
+`npx playwright install chromium` once.
+
+Deployment: Vercel builds `web/` (see `web/vercel.json`) on every push; `master` is production at
+<https://custom-maps-nu.vercel.app/>. Other `*.vercel.app` aliases are behind Vercel SSO.
 
 ---
 
@@ -145,32 +184,36 @@ web/src/core/
   DMatrix.ts               — double-precision 3×3 matrix (determinant, inverse, multiply)
   GroundOverlay.ts         — data model for a georeferenced map
   Tiepoint.ts              — Tiepoint interface + helpers
-  GeoidHeight.ts           — EGM96 lookup
+  GeoidHeight.ts           — EGM96 lookup                                   (planned)
 
 web/src/io/
-  KmzReader.ts             — JSZip + DOMParser → GroundOverlay + image Blob
-  KmzWriter.ts             — GroundOverlay + image Blob → JSZip Blob download
+  KmzReader.ts             — JSZip + DOMParser → GroundOverlay + image Blob (parseKml is pure)
+  KmzWriter.ts             — GroundOverlay + image Blob → JSZip Blob (buildKml is pure)
 
 web/src/location/
   LocationTracker.ts       — watchPosition wrapper, emits LocationUpdate events
-  CompassTracker.ts        — deviceorientation wrapper, emits heading degrees
+  CompassTracker.ts        — deviceorientation wrapper, emits heading degrees (planned)
 
 web/src/ui/
   MapView.ts               — main map page, Leaflet map + canvas image overlay
   LocationLayer.ts         — GPS dot, accuracy circle, heading arrow
-  ScaleBar.ts              — scale display, updates on zoom
-  DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel
+  ScaleBar.ts              — scale display, updates on zoom                  (planned)
+  DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
   MapLibrary.ts            — IndexedDB-backed map list
   editor/
     MapEditor.ts           — wizard orchestrator
     ImagePointPicker.ts    — pannable canvas, click to pick pixel
-    GeoPointPicker.ts      — Leaflet map, click to pick lat/lon
-    MapPreview.ts          — image warped over Leaflet for alignment check
+    GeoPointPicker.ts      — Leaflet map, click to pick lat/lon             (planned)
+    MapPreview.ts          — image warped over Leaflet for alignment check  (planned)
 
 web/src/storage/
   MapStore.ts              — IndexedDB wrapper for KMZ blobs
-  Prefs.ts                 — localStorage wrapper for settings
+  Prefs.ts                 — localStorage wrapper for settings              (planned)
 ```
+
+Files marked *(planned)* do not exist yet. Known gaps vs. this spec: `GeoToImageConverter`
+uses only the first 3 tiepoints (no least-squares fit for 4+ yet), and `KmzReader` does not
+read `gx:LatLonQuad`.
 
 ---
 
@@ -216,7 +259,8 @@ The UI uses **Pico.css** (classless). Follow these rules:
 - Do not use single-precision floats for coordinate math.
 - Do not store binary data in localStorage.
 - Call `watchPosition` and `requestPermission` only in response to a user gesture.
-- The KMZ files the web app writes must also open in the Android app — preserve the schema exactly.
+- The KMZ files the web app writes must also open in the Android app — preserve the schema in
+  `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `web/src/io/Kml.test.ts` guards it).
 - No external requests except OSM tile servers and optional user-provided KMZ URLs.
-- When unsure about the KMZ schema or feature behaviour, read `PRD.md` or inspect
-  `app/src/main/java/com/custommapsapp/android/kml/` for the reference implementation.
+- When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
+- Every change ships with a test (unit or e2e) and `npm run check` passing.

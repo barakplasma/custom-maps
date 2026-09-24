@@ -11,7 +11,17 @@ export interface NewMapInput {
 }
 
 export async function writeKmz(input: NewMapInput): Promise<Blob> {
-  const { name, imageBlob, imageFilename, tiepoints } = input;
+  const zip = new JSZip();
+  zip.file('doc.kml', buildKml(input));
+  zip.file(input.imageFilename, input.imageBlob);
+
+  return zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/vnd.google-earth.kmz' });
+}
+
+// Builds doc.kml. Tiepoint markup mirrors the Android app's writer exactly
+// (xmlns:tie="urn:tiepoints", comma-separated, image before geo) — see docs/KMZ_FORMAT.md.
+export function buildKml(input: Pick<NewMapInput, 'name' | 'imageFilename' | 'tiepoints'>): string {
+  const { name, imageFilename, tiepoints } = input;
 
   // Derive a LatLonBox from tiepoint extents for compatibility with standard KML readers
   const lats = tiepoints.map(t => t.lat);
@@ -20,13 +30,13 @@ export async function writeKmz(input: NewMapInput): Promise<Blob> {
   const east  = Math.max(...lons), west  = Math.min(...lons);
 
   const tiepointsXml = tiepoints.map(t =>
-    `      <tie:tiepoint>\n` +
-    `        <tie:geo>${t.lon} ${t.lat}</tie:geo>\n` +
-    `        <tie:image>${Math.round(t.xPixel)} ${Math.round(t.yPixel)}</tie:image>\n` +
-    `      </tie:tiepoint>`
+    `        <tie:tiepoint>\n` +
+    `          <tie:image>${Math.round(t.xPixel)},${Math.round(t.yPixel)}</tie:image>\n` +
+    `          <tie:geo>${t.lon},${t.lat}</tie:geo>\n` +
+    `        </tie:tiepoint>`
   ).join('\n');
 
-  const kml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <GroundOverlay>
@@ -39,18 +49,12 @@ export async function writeKmz(input: NewMapInput): Promise<Blob> {
         <west>${west}</west>
         <rotation>0</rotation>
       </LatLonBox>
-      <ExtendedData xmlns:tie="urn:tiepoint">
+      <ExtendedData xmlns:tie="urn:tiepoints">
 ${tiepointsXml}
       </ExtendedData>
     </GroundOverlay>
   </Document>
 </kml>`;
-
-  const zip = new JSZip();
-  zip.file('doc.kml', kml);
-  zip.file(imageFilename, imageBlob);
-
-  return zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/vnd.google-earth.kmz' });
 }
 
 function escapeXml(s: string): string {

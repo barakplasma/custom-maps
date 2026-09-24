@@ -11,6 +11,40 @@ export async function readKmz(blob: Blob): Promise<GroundOverlay> {
   if (!kmlEntry) throw new Error('No .kml file found in KMZ');
 
   const kmlText = await kmlEntry.async('string');
+  const { name, imageFilename, tiepoints, latLonBox } = parseKml(kmlText);
+
+  // Load image blob from ZIP
+  const imageBlob = await loadImageFromZip(zip, imageFilename, kmlEntry.name);
+
+  // Decode image dimensions
+  const { width: imageWidth, height: imageHeight } = await getImageDimensions(imageBlob);
+
+  // If no tiepoints, synthesize from LatLonBox
+  if (tiepoints.length === 0 && latLonBox) {
+    tiepoints.push(
+      { xPixel: 0,          yPixel: 0,           lon: latLonBox.west, lat: latLonBox.north },
+      { xPixel: imageWidth, yPixel: imageHeight,  lon: latLonBox.east, lat: latLonBox.south },
+    );
+  }
+
+  if (tiepoints.length < 2) throw new Error('Not enough tiepoints to georeference this map');
+
+  // Validate the converter can be constructed
+  const conv = new GeoToImageConverter();
+  if (!conv.setFromTiepoints(tiepoints)) throw new Error('Failed to compute georeferencing transform');
+
+  return { name, imageFilename, imageBlob, imageWidth, imageHeight, tiepoints, latLonBox };
+}
+
+export interface ParsedKml {
+  name: string;
+  imageFilename: string;
+  tiepoints: Tiepoint[];
+  latLonBox?: LatLonBox;
+}
+
+// Pure KML parsing (no ZIP, no image decoding) so it can be unit tested.
+export function parseKml(kmlText: string): ParsedKml {
   const dom = new DOMParser().parseFromString(kmlText, 'application/xml');
 
   const parseError = dom.querySelector('parsererror');
@@ -59,27 +93,7 @@ export async function readKmz(blob: Blob): Promise<GroundOverlay> {
     };
   }
 
-  // Load image blob from ZIP
-  const imageBlob = await loadImageFromZip(zip, imageFilename, kmlEntry.name);
-
-  // Decode image dimensions
-  const { width: imageWidth, height: imageHeight } = await getImageDimensions(imageBlob);
-
-  // If no tiepoints, synthesize from LatLonBox
-  if (tiepoints.length === 0 && latLonBox) {
-    tiepoints.push(
-      { xPixel: 0,          yPixel: 0,           lon: latLonBox.west, lat: latLonBox.north },
-      { xPixel: imageWidth, yPixel: imageHeight,  lon: latLonBox.east, lat: latLonBox.south },
-    );
-  }
-
-  if (tiepoints.length < 2) throw new Error('Not enough tiepoints to georeference this map');
-
-  // Validate the converter can be constructed
-  const conv = new GeoToImageConverter();
-  if (!conv.setFromTiepoints(tiepoints)) throw new Error('Failed to compute georeferencing transform');
-
-  return { name, imageFilename, imageBlob, imageWidth, imageHeight, tiepoints, latLonBox };
+  return { name, imageFilename, tiepoints, latLonBox };
 }
 
 function findChildByLocalName(parent: Element, localName: string): Element | null {
