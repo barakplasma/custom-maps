@@ -1,0 +1,81 @@
+/* App-level CSS. Prefer Web Awesome components and utility classes; rules here exist only
+   where the library has no equivalent — mostly mobile layout and Leaflet integration. */
+
+html, body { height: 100%; margin: 0; }
+/* Stop pull-to-refresh (Android) and rubber-band bounce (iOS) from hijacking map and image drags. */
+html, body { overscroll-behavior: none; }
+
+/* Native styles give form controls a display value, which would override the hidden attribute. */
+[hidden] { display: none !important; }
+
+/* Let taps on a button's icon land on the button itself. */
+wa-button > wa-icon { pointer-events: none; }
+
+/* Full-height screen with a sticky header and a sticky bottom action bar within thumb reach.
+   (<wa-page> has no sticky bottom region, so this stays custom.) */
+.app-screen { min-height: 100dvh; display: flex; flex-direction: column; }
+.app-bar,
+.action-bar {
+  position: sticky;
+  z-index: 10;
+  padding: var(--wa-space-s) var(--wa-space-m);
+  background: var(--wa-color-surface-default);
+}
+.app-bar {
+  top: 0;
+  padding-top: max(var(--wa-space-s), env(safe-area-inset-top));
+  border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+}
+.app-bar h1 { margin: 0; }
+.app-content { flex: 1; padding: var(--wa-space-m); }
+.action-bar {
+  bottom: 0;
+  padding-bottom: max(var(--wa-space-s), env(safe-area-inset-bottom));
+  border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+}
+
+/* Map list rows: left-aligned name with the chevron at the far edge, long names truncated. */
+.map-list .open::part(base) { justify-content: flex-start; }
+.map-list .open::part(label) { flex: 1; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Controls floating over the full-screen map (clear of notches and home indicators). */
+.map-fullscreen { position: fixed; inset: 0; }
+.float-top-start,
+.float-bottom-end {
+  position: fixed;
+  z-index: 1000;
+  box-shadow: var(--wa-shadow-m);
+  border-radius: var(--wa-border-radius-pill);
+}
+.float-top-start { top: max(var(--wa-space-m), env(safe-area-inset-top)); left: var(--wa-space-m); }
+.float-bottom-end {
+  bottom: max(var(--wa-space-xl), calc(env(safe-area-inset-bottom) + var(--wa-space-s)));
+  right: var(--wa-space-m);
+}
+
+/* Map editor: image on top, map below, splitting the space between header and action bar. */
+.editor-split { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.editor-split > * { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+.editor-image { background: var(--wa-color-surface-lowered); }
+/* touch-action: none lets the picker handle one-finger pan and two-finger pinch itself. */
+.editor-image canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.editor-map > div { position: absolute; inset: 0; }
+
+/* ---- Leaflet, themed to match ---- */
+.leaflet-container { font: inherit; background: var(--wa-color-surface-lowered); }
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background: var(--wa-color-surface-raised);
+  color: var(--wa-color-text-normal);
+  border-color: var(--wa-color-surface-border);
+}
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--wa-color-surface-raised) 80%, transparent) !important;
+  color: var(--wa-color-text-quiet);
+}
+.leaflet-control-attribution a { color: var(--wa-color-text-link); }
+.leaflet-control > wa-button { box-shadow: var(--wa-shadow-m); border-radius: var(--wa-border-radius-pill); }
+
+/* Dark mode: OSM only serves light tiles, so invert them into a dark basemap.
+   Only the tile pane is filtered — the user's map image and GPS layers keep true colours. */
+.wa-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }

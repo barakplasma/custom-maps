@@ -1,10 +1,52 @@
 # custom-maps
 
-Custom Maps can use almost any map image as a GPS map. The map image can be provided in JPG, PNG, GIF, or PDF format.
-If a PDF file is used the user must select the map page from the PDF document, and the page is converted into JPG image
-before it is used as a GPS map.
+Use almost any map image — a trail map, a campus map, a scanned paper map — as a live GPS map in
+your browser. Pin a few points on the image to real-world locations, and Custom Maps overlays it
+on OpenStreetMap and shows where you are on it.
 
-The project can be directly imported to Android Studio, but before it can be successfully built, it has to be provided
-a Google Maps API key, as a string resource named "google_maps_key". This is typically done by creating file 
-"google_maps_api.xml" in app/src/main/res/values directory, and the file should contain only that one string resource.
-More details for getting a Google Maps API key can be found at https://developers.google.com/maps/documentation/android-sdk/get-api-key.
+Built for current Android and iOS browsers. Install it to your home screen ("Add to Home
+Screen" / "Install app") and it works offline, keeps the screen on while tracking, and follows
+your device's light/dark setting.
+
+Local-first: no server, no account, no analytics. Maps are stored in your browser (IndexedDB) and
+can be exported as `.kmz` files that are compatible with Google Earth and the original Custom Maps
+Android app.
+
+Live: <https://custom-maps-nu.vercel.app/>
+
+## Develop
+
+Vite + TypeScript + Leaflet, with [Web Awesome](https://webawesome.com) UI components and
+[Lucide](https://lucide.dev) icons.
+
+```sh
+npm install
+npm run dev          # http://localhost:5173
+```
+
+| Command | What it does |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Vitest unit tests (`src/**/*.test.ts`) |
+| `npm run test:e2e` | Playwright smoke tests against the production build at 375 px width |
+| `npm run check` | All of the above plus `npm run build` — run before pushing |
+
+First time running e2e tests outside Claude Code on the web: `npx playwright install chromium`.
+The iPhone (WebKit) project runs in CI; locally use `npx playwright install webkit` and `PW_WEBKIT=1`.
+
+## Docs
+
+- [`PRD.md`](PRD.md) — product requirements
+- [`docs/KMZ_FORMAT.md`](docs/KMZ_FORMAT.md) — the `.kmz` schema and Android compatibility rules
+- [`CLAUDE.md`](CLAUDE.md) — architecture and conventions (for humans and AI agents alike)
+
+## History
+
+This project started as the Custom Maps Android app by Marko Teittinen. The Android source has
+been removed from this branch of the repo in favour of the web port; it remains available in git
+history.
+
+## License
+
+Apache 2.0 — see [`COPYING`](COPYING). `src/core/DMatrix.ts` is additionally covered by
+[`Skia-LICENSE.txt`](Skia-LICENSE.txt).

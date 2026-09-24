@@ -8,9 +8,9 @@ GPS map. The app uses OpenStreetMap as its basemap and the browser Geolocation A
 position tracking. All data lives on the user's device; no account or server is required.
 
 The UI is designed **mobile-first**: every screen is optimized for one-handed use on a phone,
-with large tap targets, bottom-anchored controls, and minimal chrome. Styling is provided by
-**Pico.css** — a classless CSS framework — supplemented by minimal custom CSS only where Pico's
-defaults are insufficient.
+with large tap targets, bottom-anchored controls, and minimal chrome. UI components come from
+**Web Awesome** (open source web components), supplemented by minimal token-based custom CSS. The
+interface follows the device's light/dark setting, including a darkened basemap at night.
 
 Maps are stored as `.kmz` files (ZIP archives containing an image + a KML document), which is an
 established open format compatible with Google Earth and the existing Custom Maps Android app.
@@ -184,7 +184,8 @@ single-precision causes visible positioning errors.
 |---------|--------|-------|
 | Map tiles | OpenStreetMap | No API key; free |
 | Map library | Leaflet.js | Lightweight, mobile-friendly |
-| UI framework | **Pico.css** | Classless; semantic HTML only |
+| UI components | **Web Awesome** | MIT web components; no framework; light/dark themes |
+| Icons | Lucide | ISC; bundled locally, no icon CDN |
 | ZIP/KMZ read+write | JSZip | In-browser, no server |
 | PDF rasterization | PDF.js | Page picker before tiepointing |
 | Offline tile cache | Service Worker + Cache API | On-demand |
@@ -193,17 +194,16 @@ single-precision causes visible positioning errors.
 | Build | Vite | Fast dev + ESM output |
 | Language | TypeScript | Full double-precision math |
 
-### Pico.css Usage Rules
+### UI Component Rules
 
-- Use **semantic HTML elements** (`<nav>`, `<main>`, `<article>`, `<dialog>`, `<details>`, `<summary>`)
-  to get Pico styling automatically — avoid adding extra class names.
-- Use `<dialog>` for modals (settings, tiepoint wizard steps, safety warning).
-- Use `<details>`/`<summary>` for the collapsible details panel.
-- Use `<progress>` for KMZ download progress — Pico styles it natively.
-- Use Pico's CSS custom properties (`--pico-*`) for any colour or spacing overrides rather than
-  writing new selectors.
-- The map canvas itself sits outside Pico's flow (position: fixed, z-index layering) — Pico is
-  used for all chrome: library list, editor wizard, settings, panels.
+- Use Web Awesome components for chrome: `<wa-button>`, `<wa-dialog>` (modals, confirmations,
+  safety warning), `<wa-input>`, `<wa-callout>`, `<wa-toast>` (notifications), `<wa-details>`
+  (collapsible details panel), `<wa-progress-bar>` (KMZ download progress).
+- Style with Web Awesome design tokens (`--wa-*`) and layout utilities, never raw colours, so
+  light and dark mode both work.
+- Light/dark mode follows `prefers-color-scheme` and switches live when the OS setting changes.
+- The map itself sits outside the component flow (position: fixed, z-index layering); in dark mode
+  OSM tiles are inverted, the user's map image is never altered.
 
 ---
 

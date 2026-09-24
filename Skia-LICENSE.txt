@@ -1,6 +1,6 @@
 The license below applies only to file
-    src/main/java/com/custommapsapp/android/DMatrix.java
-which is based on the SkMatrix class in Skia C++ libraries
+    src/core/DMatrix.ts
+(a port of the original Android DMatrix.java) which is based on the SkMatrix class in Skia C++ libraries
 (https://github.com/google/skia). The other files are licensed under
 Apache license 2.0 that can be found in file named COPYING.
 
