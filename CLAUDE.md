@@ -65,7 +65,7 @@ In Claude Code on the web, Chromium is preinstalled and the SessionStart hook ru
 `npm install`, so every command above works immediately. Elsewhere, run
 `npx playwright install chromium` once.
 
-Deployment: Vercel builds `web/` (see `web/vercel.json`) on every push; `master` is production at
+Deployment: Vercel builds `web/` (see `web/vercel.json`) on every push; `main` is production at
 <https://custom-maps-nu.vercel.app/>. Other `*.vercel.app` aliases are behind Vercel SSO.
 
 ---
