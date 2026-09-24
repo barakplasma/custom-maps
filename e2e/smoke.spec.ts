@@ -96,3 +96,25 @@ test('create-map wizard opens', async ({ page }) => {
   await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
 });
+
+test.describe('installed app', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('opens offline after the first visit', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'webkit', "Playwright's WebKit doesn't run service workers in its ephemeral test contexts");
+    await page.goto('/');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload(); // now controlled by the service worker
+    await context.setOffline(true);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
+  });
+
+  test('has an installable web app manifest', async ({ page, request }) => {
+    await page.goto('/');
+    const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+    const manifest = await (await request.get(new URL(href!, page.url()).href)).json();
+    expect(manifest).toMatchObject({ name: 'Custom Maps', display: 'standalone' });
+    expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === 'maskable')).toBe(true);
+  });
+});

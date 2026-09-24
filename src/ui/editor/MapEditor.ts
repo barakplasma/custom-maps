@@ -168,7 +168,7 @@ export class MapEditor {
           <wa-button id="cm-save" variant="brand" size="l">
             <wa-icon slot="start" name="check"></wa-icon> Save map
           </wa-button>
-          <p class="wa-body-s wa-color-text-quiet">Saves to this device and downloads a .kmz copy you can share.</p>
+          <p class="wa-body-s wa-color-text-quiet">Saves to this device, then lets you share or keep a .kmz copy.</p>
         </main>
       </div>`;
 
@@ -204,18 +204,11 @@ export class MapEditor {
         tiepoints,
       });
 
-      // Trigger download — must be in DOM for Firefox
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(kmzBlob);
-      a.download = `${name.replace(/[^a-zA-Z0-9._-]/g,'_')}.kmz`;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-
-      // Save to library
       await mapStore.put({ id: crypto.randomUUID(), name, kmzBlob, createdAt: Date.now() });
+      const file = new File([kmzBlob], `${name.replace(/[^a-zA-Z0-9._-]/g, '_')}.kmz`, {
+        type: 'application/vnd.google-earth.kmz',
+      });
+      await shareOrDownload(file);
 
       this.onDone();
     } catch (err) {
@@ -253,6 +246,24 @@ async function setInitialView(map: L.Map, locate: LocateControl): Promise<void> 
   let userMoved = false;
   map.once('dragstart zoomstart', () => { userMoved = true; });
   if (await geolocationAlreadyGranted() && !userMoved) await locate.locate(map);
+}
+
+// Phones get the native share sheet (Files, Drive, messaging…); elsewhere the file downloads.
+async function shareOrDownload(file: File): Promise<void> {
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: file.name });
+      return;
+    } catch (err) {
+      if ((err as DOMException).name === 'AbortError') return; // user closed the sheet
+      // NotAllowedError etc.: fall back to a download
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = file.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }
 
 function escapeAttr(s: string): string {

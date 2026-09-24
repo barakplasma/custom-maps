@@ -2,6 +2,8 @@
    where the library has no equivalent — mostly mobile layout and Leaflet integration. */
 
 html, body { height: 100%; margin: 0; }
+/* Stop pull-to-refresh (Android) and rubber-band bounce (iOS) from hijacking map and image drags. */
+html, body { overscroll-behavior: none; }
 
 /* Native styles give form controls a display value, which would override the hidden attribute. */
 [hidden] { display: none !important; }

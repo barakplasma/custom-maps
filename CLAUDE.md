@@ -47,7 +47,7 @@ All commands run from the repo root:
 npm run dev          # dev server on :5173
 npm run typecheck    # tsc --noEmit
 npm test             # Vitest unit tests: src/**/*.test.ts (fast, run often)
-npm run test:e2e     # Playwright: builds, serves on :4173, drives Chromium at 375 px
+npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 7) + iPhone Safari (WebKit, iPhone SE 375 px)
 npm run check        # everything — must pass before pushing
 ```
 
@@ -65,12 +65,32 @@ Workflow for changes:
 4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
    so they can be unit tested without a browser.
 
-In Claude Code on the web, Chromium is preinstalled and the SessionStart hook runs
-`npm install`, so every command above works immediately. Elsewhere, run
-`npx playwright install chromium` once.
+In Claude Code on the web, the SessionStart hook runs `npm install` and sets
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` to the preinstalled Chromium, so the commands above work
+immediately. The WebKit (iPhone) project runs in CI, or locally with `PW_WEBKIT=1` after
+`npx playwright install webkit` (+ `npx playwright install-deps webkit` on Linux).
+Elsewhere, run `npx playwright install chromium` once.
 
 Deployment: Vercel builds the repo (see `vercel.json`) on every push; `master` is production at
 <https://custom-maps-nu.vercel.app/>. Other `*.vercel.app` aliases are behind Vercel SSO.
+
+---
+
+## Platform: current Android and iOS browsers only
+
+No legacy support. Vite's default build target (`baseline-widely-available`: Chrome 111+,
+iOS/Safari 16.4+) is the floor — don't add polyfills, feature checks for baseline APIs, or a
+custom `build.target`. Use platform features directly:
+
+- **PWA** via `vite-plugin-pwa` (config in `vite.config.ts`): installable, offline app shell,
+  OSM tiles the user has viewed cached for 7 days. Icons are generated from `public/icon.svg`.
+  Never prefetch tiles in bulk (OSM tile usage policy).
+- **Storage persistence**: `navigator.storage.persist()` after saving a map (Safari evicts
+  unpersisted site data). KMZ bytes are stored as `ArrayBuffer`, not `Blob` — Safari private
+  browsing rejects Blobs in IndexedDB.
+- **Screen Wake Lock** while GPS tracking (`LocationTracker`).
+- **Web Share** with files for saved `.kmz` (falls back to a download).
+- `100dvh`, safe-area insets, `interactive-widget=resizes-content`, `overscroll-behavior: none`.
 
 ---
 
@@ -234,7 +254,7 @@ read `gx:LatLonQuad`.
 - **Canvas overlay** for the map image — gives full control over rotation and transform; use a
   custom `L.Layer` that redraws on Leaflet's `viewreset` and `move` events.
 - **IndexedDB** (via `idb`) for KMZ storage — binary blobs do not fit in localStorage.
-- **Service Worker** for offline — cache app shell and OSM tiles on demand.
+- **vite-plugin-pwa** (Workbox) for the service worker — app shell precached, OSM tiles cached on view.
 
 ---
 

@@ -99,7 +99,8 @@ test('without permission, the map picker reopens where it was last left', async 
   expect(tiles.some((k) => k.startsWith('16/'))).toBe(false);
 });
 
-test('two-finger pinch zooms the map image', async ({ page }) => {
+test('two-finger pinch zooms the map image', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Multi-touch is simulated through the Chrome DevTools protocol');
   await recordTiles(page);
   await openTiepointStep(page);
   const canvas = page.locator('#cm-canvas');

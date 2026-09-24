@@ -4,7 +4,9 @@ Use almost any map image — a trail map, a campus map, a scanned paper map — 
 your browser. Pin a few points on the image to real-world locations, and Custom Maps overlays it
 on OpenStreetMap and shows where you are on it.
 
-Works day or night: the interface follows your device's light/dark setting.
+Built for current Android and iOS browsers. Install it to your home screen ("Add to Home
+Screen" / "Install app") and it works offline, keeps the screen on while tracking, and follows
+your device's light/dark setting.
 
 Local-first: no server, no account, no analytics. Maps are stored in your browser (IndexedDB) and
 can be exported as `.kmz` files that are compatible with Google Earth and the original Custom Maps
@@ -30,6 +32,7 @@ npm run dev          # http://localhost:5173
 | `npm run check` | All of the above plus `npm run build` — run before pushing |
 
 First time running e2e tests outside Claude Code on the web: `npx playwright install chromium`.
+The iPhone (WebKit) project runs in CI; locally use `npx playwright install webkit` and `PW_WEBKIT=1`.
 
 ## Docs
 
