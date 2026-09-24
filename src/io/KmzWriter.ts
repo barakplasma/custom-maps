@@ -12,8 +12,10 @@ export interface NewMapInput {
 
 export async function writeKmz(input: NewMapInput): Promise<Blob> {
   const zip = new JSZip();
-  zip.file('doc.kml', buildKml(input));
-  zip.file(input.imageFilename, input.imageBlob);
+  // A fixed timestamp makes the same map produce the same bytes, so a shared map keeps its link
+  const date = new Date(2000, 0, 1);
+  zip.file('doc.kml', buildKml(input), { date });
+  zip.file(input.imageFilename, input.imageBlob, { date });
 
   return zip.generateAsync({ type: 'blob', compression: 'STORE', mimeType: 'application/vnd.google-earth.kmz' });
 }

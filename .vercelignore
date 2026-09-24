@@ -1,0 +1,2 @@
+# Unit tests next to the upload function are not Vercel Functions
+api/*.test.ts

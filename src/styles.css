@@ -79,3 +79,13 @@ wa-button > wa-icon { pointer-events: none; }
 /* Dark mode: OSM only serves light tiles, so invert them into a dark basemap.
    Only the tile pane is filtered — the user's map image and GPS layers keep true colours. */
 .wa-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+
+/* A QR code is read by another phone's camera, which needs dark modules on a light quiet zone.
+   Theme tokens flip in dark mode, so these colours are fixed on purpose. */
+wa-qr-code {
+  color: black;
+  --corner-color: black;
+  background: white;
+  padding: var(--wa-space-s);
+  border-radius: var(--wa-border-radius-m);
+}

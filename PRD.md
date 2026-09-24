@@ -97,6 +97,8 @@ mi/ft, or nautical miles). Updates on every zoom change.
 - Show map name and a thumbnail.
 - Tap to open; swipe or long-press to delete.
 - Import from a `.kmz` file or a remote URL.
+- Share a map as a short link (`/m/<id>`, with a QR code): uploaded to Vercel Blob within
+  free-tier caps; opening the link saves the map on the recipient's device.
 
 ### Settings
 

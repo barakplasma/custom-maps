@@ -12,6 +12,10 @@ Local-first: no server, no account, no tracking cookies (only anonymous, cookiel
 can be exported as `.kmz` files that are compatible with Google Earth and the original Custom Maps
 Android app.
 
+Share a map as a file, or as a short link (`custom-maps-nu.vercel.app/m/k7p2x9qa`, with a QR code)
+that opens it straight in the app. Linked maps are stored publicly on Vercel Blob, kept within the
+free tier by upload caps.
+
 Live: <https://custom-maps-nu.vercel.app/>
 
 ## Develop
