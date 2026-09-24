@@ -15,9 +15,12 @@
   },
   "dependencies": {
     "@awesome.me/webawesome": "^3.13.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "idb": "^8.0.3",
     "jszip": "^3.10.2",
     "leaflet": "^1.9.4",
+    "leaflet.locatecontrol": "^0.90.1",
     "lucide-static": "^1.48.0"
   },
   "devDependencies": {

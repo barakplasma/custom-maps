@@ -124,3 +124,88 @@ test('two-finger pinch zooms the map image', async ({ page, browserName }) => {
   // A pinch is not a tap: no point was picked
   await expect(page.getByText('Tap a spot on the image')).toBeVisible();
 });
+
+test('tiepoint screen fits the viewport with a tall photo, even as the address bar moves', async ({ page }) => {
+  await recordTiles(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create map' }).click();
+  // A tall portrait photo, like a picture of a trailhead sign taken on a phone
+  const tall = await page.evaluate(async () => {
+    const c = new OffscreenCanvas(900, 1600);
+    c.getContext('2d')!.fillRect(0, 0, 900, 1600);
+    return [...new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer())];
+  });
+  await page.locator('#cm-img-input').setInputFiles({ name: 'sign.png', mimeType: 'image/png', buffer: Buffer.from(tall) });
+  await expect(page.locator('#cm-leaflet.leaflet-container')).toBeVisible();
+
+  const { width, height } = page.viewportSize()!;
+  for (const h of [height, height - 80, height]) {
+    await page.setViewportSize({ width, height: h });
+    await expect.poll(() => page.evaluate(() => {
+      const img = document.querySelector('.editor-image')!.getBoundingClientRect().height;
+      const map = document.querySelector('.editor-map')!.getBoundingClientRect().height;
+      return {
+        noScroll: document.scrollingElement!.scrollHeight <= innerHeight,
+        headerAtTop: document.querySelector('.app-bar')!.getBoundingClientRect().top === 0,
+        equalHalves: Math.abs(img - map) < 1,
+      };
+    })).toEqual({ noScroll: true, headerAtTop: true, equalHalves: true });
+  }
+});
+
+// Runs the whole wizard: 2 tiepoints, then saves with `name` (blank = let the app pick one).
+async function createMap(page: Page, name: string): Promise<void> {
+  await openTiepointStep(page);
+  for (const [f1, f2] of [[0.3, 0.3], [0.7, 0.7]]) {
+    await tapAt(page, '#cm-canvas', f1, f2);
+    await tapAt(page, '#cm-leaflet', f1, f2);
+    await page.getByRole('button', { name: 'Confirm' }).click();
+  }
+  const input = page.getByRole('textbox', { name: 'Map name' });
+  await expect(input).toHaveValue('');
+  if (name) await input.fill(name);
+  await page.getByRole('button', { name: 'Save map' }).click();
+  await expect(page.getByRole('heading', { name: 'Custom Maps' })).toBeVisible();
+}
+
+test.describe('saving a map', () => {
+  test('a blank name gets a short random one', async ({ page }) => {
+    await recordTiles(page);
+    await createMap(page, '');
+    await expect(page.locator('.map-list wa-button.open')).toHaveText(/^\s*Map [a-z0-9]{4}\s*$/);
+  });
+
+  test('a typed name is kept, including non-Latin letters', async ({ page }) => {
+    await recordTiles(page);
+    await createMap(page, 'בית ברל 2');
+    await expect(page.getByRole('button', { name: 'בית ברל 2', exact: true })).toBeVisible();
+  });
+});
+
+test('editing a map re-places its tiepoints and keeps its name', async ({ page }) => {
+  await recordTiles(page);
+  await createMap(page, 'Trail');
+  const overlay = page.locator('.leaflet-overlay-pane img');
+  await page.getByRole('button', { name: 'Trail', exact: true }).click();
+  await expect(overlay).toBeVisible();
+  const before = await overlay.getAttribute('style');
+  await page.getByRole('button', { name: 'Back to maps' }).click();
+
+  await page.getByRole('button', { name: 'More actions for Trail' }).click();
+  await page.getByRole('menuitem', { name: 'Edit tiepoints' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit Trail' })).toBeVisible();
+  // New, different points
+  for (const [f1, f2] of [[0.2, 0.6], [0.8, 0.4]]) {
+    await tapAt(page, '#cm-canvas', f1, f2);
+    await tapAt(page, '#cm-leaflet', f1, f2);
+    await page.getByRole('button', { name: 'Confirm' }).click();
+  }
+  await expect(page.getByRole('textbox', { name: 'Map name' })).toHaveValue('Trail');
+  await page.getByRole('button', { name: 'Save map' }).click();
+
+  // Same map (not a copy), now placed differently
+  await expect(page.locator('.map-list wa-button.open')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Trail', exact: true }).click();
+  await expect(overlay).toBeVisible();
+  expect(await overlay.getAttribute('style')).not.toBe(before);
+});

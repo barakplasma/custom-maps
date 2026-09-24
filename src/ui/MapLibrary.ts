@@ -4,6 +4,8 @@ import type { GroundOverlay } from '../core/GroundOverlay';
 import { MapView } from './MapView';
 import { MapEditor } from './editor/MapEditor';
 import { showToast } from './toast';
+import { readNow } from '../io/readNow';
+import { shareKmz } from './share';
 
 export class MapLibrary {
   constructor(private root: HTMLElement) {}
@@ -39,9 +41,14 @@ export class MapLibrary {
                       ${escapeHtml(m.name)}
                       <wa-icon slot="end" name="chevron-right"></wa-icon>
                     </wa-button>
-                    <wa-button class="del" appearance="plain" variant="danger" size="l" data-del="${m.id}" data-name="${escapeHtml(m.name)}">
-                      <wa-icon name="trash-2" label="Delete ${escapeHtml(m.name)}"></wa-icon>
-                    </wa-button>
+                    <wa-dropdown class="actions" data-id="${m.id}" data-name="${escapeHtml(m.name)}" placement="bottom-end">
+                      <wa-button slot="trigger" appearance="plain" size="l">
+                        <wa-icon name="ellipsis-vertical" label="More actions for ${escapeHtml(m.name)}"></wa-icon>
+                      </wa-button>
+                      <wa-dropdown-item value="share"><wa-icon slot="icon" name="share-2"></wa-icon>Share</wa-dropdown-item>
+                      <wa-dropdown-item value="edit"><wa-icon slot="icon" name="pencil"></wa-icon>Edit tiepoints</wa-dropdown-item>
+                      <wa-dropdown-item value="delete" variant="danger"><wa-icon slot="icon" name="trash-2"></wa-icon>Delete</wa-dropdown-item>
+                    </wa-dropdown>
                   </li>
                   <wa-divider></wa-divider>`).join('')}
                </ul>`
@@ -74,7 +81,11 @@ export class MapLibrary {
     document.getElementById('cm-file-input')!.addEventListener('change', async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      await this.importKmz(file, file.name.replace(/\.kmz$/i, ''));
+      try {
+        await this.importKmz(await readNow(file), file.name.replace(/\.kmz$/i, ''));
+      } catch (err) {
+        showToast(`Could not read that file: ${(err as Error).message}`);
+      }
     });
 
     document.getElementById('cm-create')!.addEventListener('click', () => {
@@ -95,15 +106,31 @@ export class MapLibrary {
       });
     });
 
-    // Delete asks for confirmation in a dialog
+    // Per-map menu: share, edit tiepoints, delete (with confirmation)
     const dialog = this.root.querySelector('wa-dialog')!;
     let pendingDelete: string | null = null;
-    this.root.querySelectorAll<HTMLElement>('wa-button.del').forEach(btn => {
-      btn.addEventListener('click', () => {
-        pendingDelete = btn.dataset.del!;
-        document.getElementById('cm-delete-text')!.textContent =
-          `"${btn.dataset.name}" will be removed from this device. Exported .kmz files are not affected.`;
-        dialog.open = true;
+    this.root.querySelectorAll<HTMLElement>('wa-dropdown.actions').forEach(menu => {
+      const { id, name } = menu.dataset as { id: string; name: string };
+      menu.addEventListener('wa-select', async (e) => {
+        const action = (e.detail.item as HTMLElement & { value: string }).value;
+        if (action === 'delete') {
+          pendingDelete = id;
+          document.getElementById('cm-delete-text')!.textContent =
+            `"${name}" will be removed from this device. Exported .kmz files are not affected.`;
+          dialog.open = true;
+          return;
+        }
+        const rec = await mapStore.get(id);
+        if (!rec) return;
+        if (action === 'share') await shareKmz(rec.kmzBlob, rec.name);
+        if (action === 'edit') {
+          try {
+            const overlay = await readKmz(rec.kmzBlob);
+            new MapEditor(() => this.render(), { id, name: rec.name, createdAt: rec.createdAt, overlay }).mount(this.root);
+          } catch (err) {
+            showToast(`Could not open map: ${(err as Error).message}`);
+          }
+        }
       });
     });
     document.getElementById('cm-delete-confirm')!.addEventListener('click', async () => {

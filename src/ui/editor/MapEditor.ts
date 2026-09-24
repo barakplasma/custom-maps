@@ -2,20 +2,36 @@ import L from 'leaflet';
 import { writeKmz } from '../../io/KmzWriter';
 import { mapStore } from '../../storage/MapStore';
 import type { Tiepoint } from '../../core/Tiepoint';
+import type { GroundOverlay } from '../../core/GroundOverlay';
 import { ImagePointPicker } from './ImagePointPicker';
 import { showToast } from '../toast';
-import { LocateControl } from '../LocateControl';
-import { geolocationAlreadyGranted } from '../../location/LocationTracker';
+import { readNow } from '../../io/readNow';
+import { randomMapName } from '../../core/mapName';
+import type { LocateControl } from 'leaflet.locatecontrol';
+import { createLocateControl } from '../locate';
+import { geolocationAlreadyGranted } from '../../location/permissions';
 import { getEditorView, setEditorView } from '../../storage/Prefs';
 import type WaButton from '@awesome.me/webawesome/dist/components/button/button.js';
 
 const MAX_TIEPOINTS = 2;
 
 export class MapEditor {
-  constructor(private onDone: () => void) {}
+  // With `existing`, the editor re-places the tiepoints of a saved map (same photo, same name)
+  // and overwrites it; otherwise it creates a new map.
+  constructor(private onDone: () => void, private existing?: ExistingMap) {}
 
   mount(container: HTMLElement): void {
-    this.renderStepA(container);
+    if (!this.existing) {
+      this.renderStepA(container);
+      return;
+    }
+    const { overlay } = this.existing;
+    void loadImage(overlay.imageBlob).then((img) =>
+      this.renderStepB(container, img, overlay.imageBlob, overlay.imageFilename));
+  }
+
+  private title(): string {
+    return this.existing ? `Edit ${this.existing.name}` : 'New map';
   }
 
   // Step A: pick image file
@@ -43,10 +59,13 @@ export class MapEditor {
     document.getElementById('cm-img-input')!.addEventListener('change', async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const blob = file;
-      const filename = file.name;
-      const img = await loadImage(blob);
-      this.renderStepB(container, img, blob, filename);
+      try {
+        const blob = await readNow(file);
+        const img = await loadImage(blob);
+        this.renderStepB(container, img, blob, file.name);
+      } catch (err) {
+        showToast(`Could not read that image: ${(err as Error).message}`);
+      }
     });
   }
 
@@ -65,7 +84,7 @@ export class MapEditor {
 
     container.innerHTML = `
       <div id="cm-editor" class="app-screen">
-        ${appBar('New map', stepTwoSubtitle(0))}
+        ${appBar(this.title(), stepTwoSubtitle(0))}
         <div class="editor-split">
           <div class="editor-image"><canvas id="cm-canvas"></canvas></div>
           <div class="editor-map"><div id="cm-leaflet"></div></div>
@@ -88,8 +107,19 @@ export class MapEditor {
       maxZoom: 19,
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(leafletMap);
-    const locate = new LocateControl().addTo(leafletMap);
-    void setInitialView(leafletMap, locate);
+    // Centre on the user when asked, but don't follow: the map must stay put while picking points
+    const locate = createLocateControl({ setView: 'once' }).addTo(leafletMap) as LocateControl;
+    const guides = this.existing?.overlay.tiepoints ?? [];
+    if (guides.length) {
+      // Editing: show the old points as grey guides and start where they are
+      picker.setGuides(guides.map((t) => ({ x: t.xPixel, y: t.yPixel })));
+      for (const t of guides) {
+        L.circleMarker([t.lat, t.lon], { radius: 9, color: '#ffffff', weight: 2, fillColor: '#9ca3af', fillOpacity: 1 }).addTo(leafletMap);
+      }
+      leafletMap.fitBounds(L.latLngBounds(guides.map((t) => [t.lat, t.lon])), { padding: [40, 40], maxZoom: 18 });
+    } else {
+      void setInitialView(leafletMap, locate);
+    }
     leafletMap.on('moveend', () => {
       const c = leafletMap.getCenter();
       setEditorView({ lat: c.lat, lon: c.lng, zoom: leafletMap.getZoom() });
@@ -109,7 +139,8 @@ export class MapEditor {
 
     container.querySelector('#cm-ed-back')!.addEventListener('click', () => {
       cleanup();
-      this.renderStepA(container);
+      if (this.existing) this.onDone();
+      else this.renderStepA(container);
     });
 
     picker.onPick((x, y) => {
@@ -155,27 +186,28 @@ export class MapEditor {
     imageFilename: string,
     tiepoints: Tiepoint[],
   ): void {
-    const defaultName = imageFilename.replace(/\.[^.]+$/, '');
     container.innerHTML = `
       <div id="cm-editor" class="app-screen">
-        ${appBar('New map', 'Step 3 of 3 · Name and save')}
+        ${appBar(this.title(), 'Step 3 of 3 · Name and save')}
         <main class="app-content wa-stack wa-gap-l">
           <wa-callout variant="success">
             <wa-icon slot="icon" name="check"></wa-icon>
             ${tiepoints.length} tiepoints set. Your map is ready.
           </wa-callout>
-          <wa-input id="cm-map-name" label="Map name" value="${escapeAttr(defaultName)}" placeholder="My map" autocomplete="off" size="l"></wa-input>
+          <wa-input id="cm-map-name" label="Map name" hint="Leave empty for a random name" autocomplete="off" size="l"></wa-input>
           <wa-button id="cm-save" variant="brand" size="l">
             <wa-icon slot="start" name="check"></wa-icon> Save map
           </wa-button>
-          <p class="wa-body-s wa-color-text-quiet">Saves to this device, then lets you share or keep a .kmz copy.</p>
+          <p class="wa-body-s wa-color-text-quiet">Saved on this device. Share it any time from the ⋯ menu in your map list.</p>
         </main>
       </div>`;
 
-    container.querySelector('#cm-ed-back')!.addEventListener('click', () => this.renderStepA(container));
+    container.querySelector('#cm-ed-back')!.addEventListener('click', () =>
+      this.existing ? this.onDone() : this.renderStepA(container));
     const nameEl = container.querySelector('wa-input')!;
+    if (this.existing) nameEl.value = this.existing.name;
     container.querySelector('#cm-save')!.addEventListener('click', async () => {
-      const name = (nameEl.value ?? '').trim() || defaultName || 'My map';
+      const name = (nameEl.value ?? '').trim() || randomMapName();
       await this.save(container, image, imageBlob, imageFilename, name, tiepoints);
     });
     // wa-input can only take focus once it has rendered its inner <input>
@@ -204,12 +236,12 @@ export class MapEditor {
         tiepoints,
       });
 
-      await mapStore.put({ id: crypto.randomUUID(), name, kmzBlob, createdAt: Date.now() });
-      const file = new File([kmzBlob], `${name.replace(/[^a-zA-Z0-9._-]/g, '_')}.kmz`, {
-        type: 'application/vnd.google-earth.kmz',
+      await mapStore.put({
+        id: this.existing?.id ?? crypto.randomUUID(),
+        name,
+        kmzBlob,
+        createdAt: this.existing?.createdAt ?? Date.now(),
       });
-      await shareOrDownload(file);
-
       this.onDone();
     } catch (err) {
       console.error('Save failed', err);
@@ -226,10 +258,17 @@ function appBar(title: string, subtitle: string): string {
         <wa-icon name="arrow-left" label="Back"></wa-icon>
       </wa-button>
       <div class="wa-stack wa-gap-3xs">
-        <h1 class="wa-heading-s">${title}</h1>
+        <h1 class="wa-heading-s">${escapeHtml(title)}</h1>
         <span id="cm-subtitle" class="wa-caption-m wa-color-text-quiet">${subtitle}</span>
       </div>
     </header>`;
+}
+
+export interface ExistingMap {
+  id: string;
+  name: string;
+  createdAt: number;
+  overlay: GroundOverlay;
 }
 
 function stepTwoSubtitle(n: number): string {
@@ -245,29 +284,12 @@ async function setInitialView(map: L.Map, locate: LocateControl): Promise<void> 
   // Don't pull the map away if the user already started panning or zooming it themselves
   let userMoved = false;
   map.once('dragstart zoomstart', () => { userMoved = true; });
-  if (await geolocationAlreadyGranted() && !userMoved) await locate.locate(map);
-}
-
-// Phones get the native share sheet (Files, Drive, messaging…); elsewhere the file downloads.
-async function shareOrDownload(file: File): Promise<void> {
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: file.name });
-      return;
-    } catch (err) {
-      if ((err as DOMException).name === 'AbortError') return; // user closed the sheet
-      // NotAllowedError etc.: fall back to a download
-    }
+  if (await geolocationAlreadyGranted() && !userMoved) {
+    // The plugin only moves the map for a tap; for this programmatic start, centre on the first
+    // fix. Listen after start() so the plugin has handled the fix before setView() reads it.
+    locate.start();
+    map.once('locationfound', () => { if (!userMoved) locate.setView(); });
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(file);
-  a.download = file.name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-}
-
-function escapeAttr(s: string): string {
-  return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function statusText(
@@ -290,4 +312,8 @@ function loadImage(blob: Blob): Promise<HTMLImageElement> {
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not load image')); };
     img.src = url;
   });
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

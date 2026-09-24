@@ -1,16 +1,12 @@
 import L from 'leaflet';
 import { GeoToImageConverter } from '../core/GeoToImageConverter';
 import type { GroundOverlay } from '../core/GroundOverlay';
-import { LocationTracker } from '../location/LocationTracker';
-import { LocationLayer } from './LocationLayer';
-import { showToast } from './toast';
-import type WaButton from '@awesome.me/webawesome/dist/components/button/button.js';
+import { getOverlayOpacity, setOverlayOpacity } from '../storage/Prefs';
+import { createLocateControl, keepScreenOnWhileLocating } from './locate';
 
 export class MapView {
   private map: L.Map | null = null;
   private imageUrl: string | null = null;
-  private tracker = new LocationTracker();
-  private locationLayer: LocationLayer | null = null;
 
   constructor(
     private overlay: GroundOverlay,
@@ -66,71 +62,49 @@ export class MapView {
     // Choose simple overlay vs rotated custom layer
     const rotation = this.overlay.latLonBox?.rotation ?? 0;
     const isAxisAligned = Math.abs(rotation) < 0.5 && isApproximatelyAxisAligned(corners, w, h);
-
-    if (isAxisAligned) {
-      L.imageOverlay(this.imageUrl, bounds, { opacity: 0.75 }).addTo(this.map);
-    } else {
-      (new RotatedImageLayer(this.imageUrl, conv, w, h) as unknown as L.Layer).addTo(this.map);
-    }
+    const opacity = getOverlayOpacity();
+    const imageLayer = isAxisAligned
+      ? L.imageOverlay(this.imageUrl, bounds, { opacity })
+      : new RotatedImageLayer(this.imageUrl, conv, w, h, opacity);
+    imageLayer.addTo(this.map);
 
     this.map.fitBounds(bounds, { padding: [20, 20] });
 
-    // Floating UI
-    this.mountFloatingUI(container);
+    // Navigation: follow the user with a compass heading; screen stays on meanwhile
+    createLocateControl({ setView: 'untilPan', keepCurrentZoomLevel: true, initialZoomLevel: 16 }).addTo(this.map);
+    keepScreenOnWhileLocating(this.map);
 
-    // Location layer
-    this.locationLayer = new LocationLayer(this.map);
+    this.mountFloatingUI(container, imageLayer);
   }
 
-  private mountFloatingUI(container: HTMLElement): void {
+  private mountFloatingUI(container: HTMLElement, imageLayer: { setOpacity(o: number): unknown }): void {
     container.insertAdjacentHTML('beforeend', `
-      <wa-button id="cm-map-back" class="float-top-start" appearance="filled-outlined" pill size="l">
-        <wa-icon name="arrow-left" label="Back to maps"></wa-icon>
-      </wa-button>
-      <wa-button id="cm-locate" class="float-bottom-end" variant="brand" pill size="l">
-        <wa-icon slot="start" name="locate"></wa-icon> <span>Locate me</span>
-      </wa-button>`);
+      <div class="float-top-start wa-stack wa-gap-s">
+        <wa-button id="cm-map-back" appearance="filled-outlined" pill size="l">
+          <wa-icon name="arrow-left" label="Back to maps"></wa-icon>
+        </wa-button>
+        <wa-button id="cm-opacity" appearance="filled-outlined" pill size="l">
+          <wa-icon name="blend" label="Map image transparency"></wa-icon>
+        </wa-button>
+      </div>
+      <wa-popover for="cm-opacity" placement="right-start">
+        <wa-slider id="cm-opacity-slider" label="Map image opacity" min="0.1" max="1" step="0.05"
+          value="${getOverlayOpacity()}"></wa-slider>
+      </wa-popover>`);
 
-    const backBtn = container.querySelector<HTMLElement>('#cm-map-back')!;
-    backBtn.addEventListener('click', () => this.destroy().then(this.onBack).catch(console.error));
-
-    const locateBtn = container.querySelector<WaButton>('#cm-locate')!;
-    const locateLabel = locateBtn.querySelector('span')!;
-    const locateIcon = locateBtn.querySelector('wa-icon')!;
-
-    let hasFirstFix = false;
-
-    locateBtn.addEventListener('click', () => {
-      if (this.tracker.isActive()) {
-        // Already tracking — re-center on latest known position
-        const pos = this.locationLayer?.lastLatLon;
-        if (pos && this.map) this.map.flyTo(pos, Math.max(this.map.getZoom(), 15));
-        return;
-      }
-      locateBtn.loading = true;
-      this.tracker.start(
-        u => {
-          this.locationLayer!.update(u);
-          if (!hasFirstFix) {
-            hasFirstFix = true;
-            this.map?.flyTo([u.lat, u.lon], 15);
-            locateBtn.loading = false;
-            locateLabel.textContent = 'Re-center';
-            locateIcon.setAttribute('name', 'locate-fixed');
-          }
-        },
-        err => {
-          locateBtn.loading = false;
-          showToast(`Location error: ${err.message}`);
-        },
-      );
+    container.querySelector('#cm-map-back')!.addEventListener('click', () => {
+      this.destroy();
+      this.onBack();
     });
+
+    const slider = container.querySelector('wa-slider')!;
+    slider.valueFormatter = (v: number) => `${Math.round(v * 100)}%`;
+    slider.addEventListener('input', () => imageLayer.setOpacity(slider.value));
+    slider.addEventListener('change', () => setOverlayOpacity(slider.value));
   }
 
-  async destroy(): Promise<void> {
-    this.tracker.stop();
-    this.locationLayer?.destroy();
-    this.map?.remove();
+  destroy(): void {
+    this.map?.remove(); // also stops location watching and releases the wake lock
     this.map = null;
     if (this.imageUrl) { URL.revokeObjectURL(this.imageUrl); this.imageUrl = null; }
   }
@@ -157,14 +131,22 @@ class RotatedImageLayer extends L.Layer {
     private conv: GeoToImageConverter,
     private w: number,
     private h: number,
+    private opacity: number,
   ) { super(); }
+
+  setOpacity(opacity: number): this {
+    this.opacity = opacity;
+    if (this.img) this.img.style.opacity = String(opacity);
+    return this;
+  }
 
   onAdd(map: L.Map): this {
     this.leafletMap = map;
     const pane = map.getPane('overlayPane')!;
     this.img = document.createElement('img');
+    this.img.className = 'leaflet-image-layer'; // Leaflet's CSS exempts this class from img { max-width: 100% }
     this.img.src = this.url;
-    this.img.style.cssText = `position:absolute;transform-origin:0 0;opacity:0.75;width:${this.w}px;height:${this.h}px;`;
+    this.img.style.cssText = `position:absolute;transform-origin:0 0;opacity:${this.opacity};width:${this.w}px;height:${this.h}px;`;
     this.img.draggable = false;
     pane.appendChild(this.img);
     map.on('viewreset move zoom', this.reposition, this);
@@ -185,10 +167,10 @@ class RotatedImageLayer extends L.Layer {
     const map = this.leafletMap;
     const w = this.w, h = this.h;
 
-    // Map image corners to container pixels
-    const p00 = toContainerPt(map, this.conv, 0,   0  );
-    const p10 = toContainerPt(map, this.conv, w,   0  );
-    const p01 = toContainerPt(map, this.conv, 0,   h  );
+    // Map image corners to overlay-pane pixels
+    const p00 = toLayerPt(map, this.conv, 0,   0  );
+    const p10 = toLayerPt(map, this.conv, w,   0  );
+    const p01 = toLayerPt(map, this.conv, 0,   h  );
 
     // CSS matrix(a,b,c,d,e,f) transform
     const a = (p10.x - p00.x) / w;
@@ -202,7 +184,9 @@ class RotatedImageLayer extends L.Layer {
   }
 }
 
-function toContainerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
+// Pane-relative position. The overlay pane is itself translated while the map pans, so
+// container points would apply the pan offset twice and the image would slide off the map.
+function toLayerPt(map: L.Map, conv: GeoToImageConverter, x: number, y: number): { x: number; y: number } {
   const [lat, lon] = conv.imageToLatLon(x, y);
-  return map.latLngToContainerPoint([lat, lon]);
+  return map.latLngToLayerPoint([lat, lon]);
 }

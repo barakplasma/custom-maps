@@ -4,7 +4,7 @@
 
 A **local-first, open source** browser PWA that lets users georeference any raster image and use
 it as a live GPS map, with OpenStreetMap as the basemap and the browser Geolocation API for
-position tracking. No server, no account, no analytics. Mobile-first UI built with Web Awesome
+position tracking. No server, no account; only cookieless Vercel Web Analytics. Mobile-first UI built with Web Awesome
 components, following the system light/dark setting.
 
 Full product requirements are in `PRD.md`. Read it first.
@@ -29,7 +29,7 @@ custom-maps/                 ← Vite + TypeScript app at the repo root
 ├── vercel.json
 ├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
 ├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
-├── .claude/                 ← SessionStart hook: installs deps in cloud sessions
+├── .claude/                 ← SessionStart hook (installs deps) + ponytail plugin
 ├── PRD.md
 └── CLAUDE.md
 ```
@@ -47,7 +47,7 @@ All commands run from the repo root:
 npm run dev          # dev server on :5173
 npm run typecheck    # tsc --noEmit
 npm test             # Vitest unit tests: src/**/*.test.ts (fast, run often)
-npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 7) + iPhone Safari (WebKit, iPhone SE 375 px)
+npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 10, 360 px) + iPhone Safari (WebKit, iPhone SE 375 px)
 npm run check        # everything — must pass before pushing
 ```
 
@@ -59,7 +59,7 @@ Workflow for changes:
 2. **UI changes**: add or extend a spec in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
-   375×740 and look at it, rather than guessing from the DOM — in **both** color schemes
+   the Pixel 10 profile (`devices['Pixel 10']`, 360×732) and look at it, rather than guessing from the DOM — in **both** color schemes
    (`browser.newContext({ colorScheme: 'dark' })`). Leaflet `flyTo` animations can take several
    seconds; wait before judging map screenshots.
 4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
@@ -71,8 +71,13 @@ immediately. The WebKit (iPhone) project runs in CI, or locally with `PW_WEBKIT=
 `npx playwright install webkit` (+ `npx playwright install-deps webkit` on Linux).
 Elsewhere, run `npx playwright install chromium` once.
 
+Coding style: the project enables the [ponytail](https://github.com/DietrichGebert/ponytail)
+plugin (`.claude/settings.json`) — do less, reuse what exists, lean on the platform and libraries.
+
 Deployment: Vercel builds the repo (see `vercel.json`) on every push; `master` is production at
 <https://custom-maps-nu.vercel.app/>. Other `*.vercel.app` aliases are behind Vercel SSO.
+Build/runtime logs, Web Analytics and Speed Insights are in the Vercel dashboard (enable the
+latter two under the project's Analytics / Speed Insights tabs); Claude can read them via the Vercel MCP.
 
 ---
 
@@ -88,8 +93,9 @@ custom `build.target`. Use platform features directly:
 - **Storage persistence**: `navigator.storage.persist()` after saving a map (Safari evicts
   unpersisted site data). KMZ bytes are stored as `ArrayBuffer`, not `Blob` — Safari private
   browsing rejects Blobs in IndexedDB.
-- **Screen Wake Lock** while GPS tracking (`LocationTracker`).
-- **Web Share** with files for saved `.kmz` (falls back to a download).
+- **Screen Wake Lock** while GPS tracking (`keepScreenOnWhileLocating` in `ui/locate.ts`).
+- **Web Share** with files for saved `.kmz` plus a message linking to the app (`__APP_URL__`,
+  the production URL in Vercel builds); falls back to a download.
 - `100dvh`, safe-area insets, `interactive-widget=resizes-content`, `overscroll-behavior: none`.
 
 ---
@@ -126,6 +132,10 @@ Given N ≥ 2 tiepoints, fit a 3×3 affine matrix `A` (double precision):
 - 4+ tiepoints → least squares
 
 Always invert `A` to get `A⁻¹` for the reverse direction (geo → pixel), used to place the GPS dot.
+
+**Fit in Web Mercator, not raw degrees** (`GeoToImageConverter`, as the Android editor did).
+Mercator is conformal and y-down like image rows; in raw lat/lon a 2-tiepoint fit comes out
+mirrored and squashed by cos(lat). Tiepoints are still stored as lat/lon.
 
 **Use `number` (64-bit float) everywhere. Never use `Float32Array` — precision loss corrupts
 georeferencing.**
@@ -208,6 +218,7 @@ src/core/
   DMatrix.ts               — double-precision 3×3 matrix (determinant, inverse, multiply)
   GroundOverlay.ts         — data model for a georeferenced map
   Tiepoint.ts              — Tiepoint interface + helpers
+  mapName.ts               — random short name for maps saved without one
   GeoidHeight.ts           — EGM96 lookup                                   (planned)
 
 src/io/
@@ -215,27 +226,26 @@ src/io/
   KmzWriter.ts             — GroundOverlay + image Blob → JSZip Blob (buildKml is pure)
 
 src/location/
-  LocationTracker.ts       — watchPosition wrapper, emits LocationUpdate events
-  CompassTracker.ts        — deviceorientation wrapper, emits heading degrees (planned)
+  permissions.ts           — geolocationAlreadyGranted() (no prompt on page load)
 
 src/ui/
   MapView.ts               — main map page, Leaflet map + canvas image overlay
-  LocationLayer.ts         — GPS dot, accuracy circle, heading arrow
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
   DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
-  MapLibrary.ts            — IndexedDB-backed map list
-  LocateControl.ts         — Leaflet control (wa-button) centring the map on the user
+  MapLibrary.ts            — IndexedDB-backed map list; ⋯ menu: share / edit tiepoints / delete
+  locate.ts                — leaflet.locatecontrol setup (follow-me, compass) + wake lock
+  share.ts                 — Web Share of a .kmz with a message linking to the app
   webawesome.ts            — component registration + bundled icon list
   colorScheme.ts / toast.ts
   editor/
-    MapEditor.ts           — wizard orchestrator
+    MapEditor.ts           — wizard orchestrator; also edits an existing map's tiepoints
     ImagePointPicker.ts    — canvas with drag, pinch and wheel zoom; tap to pick pixel
     GeoPointPicker.ts      — Leaflet map, click to pick lat/lon             (planned)
     MapPreview.ts          — image warped over Leaflet for alignment check  (planned)
 
 src/storage/
   MapStore.ts              — IndexedDB wrapper for KMZ blobs
-  Prefs.ts                 — localStorage wrapper for settings (last editor map view)
+  Prefs.ts                 — localStorage wrapper for settings (last editor map view, overlay opacity)
 ```
 
 Files marked *(planned)* do not exist yet. Known gaps vs. this spec: `GeoToImageConverter`
@@ -299,7 +309,7 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - Primary action bar at the bottom (within thumb reach).
 - Minimum tap target: 44×44 px.
 - `font-size` in `rem` only; never `px` for text.
-- Test every screen in 375 px wide portrait — that is the baseline.
+- Test every screen at 360 px wide portrait (Pixel 10, the owner's phone) — that is the baseline.
 
 ---
 
@@ -312,6 +322,7 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
   gesture — or after `geolocationAlreadyGranted()` confirms no prompt will appear.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
   `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `src/io/Kml.test.ts` guards it).
-- No external requests except OSM tile servers and optional user-provided KMZ URLs.
+- No external requests except OSM tile servers and optional user-provided KMZ URLs. Vercel Web
+  Analytics / Speed Insights are same-origin and only injected in Vercel builds (`src/main.ts`).
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
 - Every change ships with a test (unit or e2e) and `npm run check` passing.

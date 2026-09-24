@@ -24,7 +24,7 @@ export default defineConfig({
     {
       name: 'android-chrome',
       use: {
-        ...devices['Pixel 7'],
+        ...devices['Pixel 10'],
         launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE },
       },
     },
@@ -33,7 +33,8 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && npm run preview -- --port 4173 --strictPort',
     url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: a leftover server on :4173 would silently test a stale build
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
