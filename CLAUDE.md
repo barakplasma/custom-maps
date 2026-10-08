@@ -239,7 +239,8 @@ src/location/
   permissions.ts           — geolocationAlreadyGranted() (no prompt on page load)
 
 src/ui/
-  MapView.ts               — main map page, Leaflet map + canvas image overlay
+  MapView.ts               — main map page, Leaflet map + canvas image overlay; rotates
+                             (leaflet-rotate: two-finger twist, button: free → follow compass → north up)
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
   DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
   MapLibrary.ts            — IndexedDB-backed map list; ⋯ menu: share link / share file / edit

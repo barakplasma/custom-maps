@@ -1,4 +1,5 @@
 import L from 'leaflet';
+import 'leaflet-rotate';
 import { GeoToImageConverter } from '../core/GeoToImageConverter';
 import type { GroundOverlay } from '../core/GroundOverlay';
 import { getOverlayOpacity, setOverlayOpacity } from '../storage/Prefs';
@@ -38,9 +39,18 @@ export class MapView {
     mapDiv.className = 'map-fullscreen';
     container.appendChild(mapDiv);
 
-    this.map = L.map(mapDiv, { zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5 });
+    // Two-finger twist rotates the map; the rotate button cycles free → follow compass → north up
+    this.map = L.map(mapDiv, {
+      zoomControl: false, zoomSnap: 0.25, zoomDelta: 0.5,
+      rotate: true, touchRotate: true,
+      rotateControl: { position: 'topright', closeOnZeroBearing: false },
+    });
     // Top-left is taken by the Back button
     L.control.zoom({ position: 'topright' }).addTo(this.map);
+    // iOS only delivers compass events after a permission prompt from a tap
+    this.map.rotateControl!.getContainer()!.addEventListener('click', () => {
+      (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission?.().catch(() => {});
+    });
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

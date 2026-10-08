@@ -10,6 +10,8 @@ export function createLocateControl(options: LocateOptions = {}): LocateControl 
   return new LocateControl({
     position: 'bottomright',
     showCompass: true,
+    // The heading arrow is drawn relative to north, so it must turn with a rotated map
+    compassStyle: { rotateWithView: true } as LocateOptions['compassStyle'],
     showPopup: false,
     clickBehavior: { inView: 'setView', outOfView: 'setView', inViewNotFollowing: 'setView' },
     strings: { title: 'Show my location' },

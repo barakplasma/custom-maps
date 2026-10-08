@@ -21,6 +21,7 @@
     "idb": "^8.0.3",
     "jszip": "^3.10.2",
     "leaflet": "^1.9.4",
+    "leaflet-rotate": "^0.2.8",
     "leaflet.locatecontrol": "^0.90.1",
     "lucide-static": "^1.48.0"
   },
