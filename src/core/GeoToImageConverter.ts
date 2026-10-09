@@ -48,10 +48,10 @@ export class GeoToImageConverter {
 const RAD = Math.PI / 180;
 
 // Spherical Web Mercator in radians, y pointing south (down) like image rows.
-function toMercator(lat: number, lon: number): [number, number] {
+export function toMercator(lat: number, lon: number): [number, number] {
   return [lon * RAD, -Math.log(Math.tan(Math.PI / 4 + (lat * RAD) / 2))];
 }
 
-function fromMercator(x: number, y: number): [number, number] {
+export function fromMercator(x: number, y: number): [number, number] {
   return [(2 * Math.atan(Math.exp(-y)) - Math.PI / 2) / RAD, x / RAD];
 }
