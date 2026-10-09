@@ -29,8 +29,9 @@ custom-maps/                 ← Vite + TypeScript app at the repo root
 ├── index.html
 ├── vercel.json
 ├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
+├── docs/wiki/               ← explainers for the owner (map rotation, compass, testing)
 ├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
-├── .claude/                 ← SessionStart hook (installs deps) + ponytail plugin
+├── .claude/                 ← SessionStart hook (installs deps), ponytail plugin, skills/
 ├── PRD.md
 └── CLAUDE.md
 ```
@@ -204,7 +205,7 @@ const watchId = navigator.geolocation.watchPosition(
 ```
 
 **Compass**: listen to `deviceorientationabsolute`, fall back to `deviceorientation`.
-`event.alpha` is degrees CW from North.
+`event.alpha` grows **counter-clockwise**, so compass heading = `360 − alpha`; iOS gives `webkitCompassHeading` (already CW). See `docs/wiki/compass-on-phones.md`.
 
 **iOS Safari 13+ compass permission** — must be called from a user-gesture handler:
 
