@@ -77,6 +77,47 @@ test('a standard KML overlay with only a LatLonBox is stretched to fill the box'
   await expect(page.getByRole('button', { name: 'Box', exact: true })).toBeVisible();
 });
 
+test.describe('a LatLonBox with <rotation>', () => {
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 0, longitude: 0 } });
+
+  test('is turned counter-clockwise, as KML specifies', async ({ page }) => {
+    // A box twice as wide as tall on the map (Web Mercator), turned 90°: it becomes twice as tall
+    // as wide, and the image's top-left corner swings round to its bottom-left
+    const merc = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+    const lat = (y: number) => (Math.atan(Math.exp(y)) * 360) / Math.PI - 90;
+    const south = 32.0, north = 32.05, west = 34.7;
+    const h = merc(north) - merc(south); // box height in Mercator radians
+    const east = west + (2 * h * 180) / Math.PI;
+    await importKmz(page, await kmz(`<kml xmlns="http://www.opengis.net/kml/2.2"><GroundOverlay>
+      <name>Turned</name><Icon><href>map.png</href></Icon>
+      <LatLonBox><north>${north}</north><south>${south}</south><east>${east}</east><west>${west}</west>
+        <rotation>90</rotation></LatLonBox>
+    </GroundOverlay></kml>`));
+    const img = page.locator('.leaflet-overlay-pane img');
+    await expect(img).toBeVisible();
+
+    // Where the image's top-left pixel should be: half a box-height west of centre, a full box-height
+    // south (clockwise would put it east and north instead)
+    const cy = (merc(north) + merc(south)) / 2, cLon = (west + east) / 2;
+    const corner = { latitude: lat(cy - h), longitude: cLon - ((h / 2) * 180) / Math.PI };
+    await page.context().setGeolocation(corner);
+    await page.getByRole('button', { name: 'Show my location' }).click();
+    const dot = page.locator('.leaflet-control-locate-location');
+    await expect.poll(async () => {
+      const box = (await img.boundingBox())!, d = (await dot.boundingBox())!;
+      // The image's own pixel (0, 0): its CSS transform's translation, from its pane's origin
+      const topLeft = await img.evaluate((el) => {
+        const m = new DOMMatrix(getComputedStyle(el).transform), pane = el.parentElement!.getBoundingClientRect();
+        return { x: pane.x + m.e, y: pane.y + m.f };
+      });
+      return {
+        tallerThanWide: Math.abs(box.height / box.width - 2) < 0.05,
+        dotOnTopLeftPixel: Math.hypot(d.x + d.width / 2 - topLeft.x, d.y + d.height / 2 - topLeft.y) < 2,
+      };
+    }, { timeout: 10_000 }).toEqual({ tallerThanWide: true, dotOnTopLeftPixel: true });
+  });
+});
+
 for (const [label, kml, error] of [
   ['malformed XML', '<kml><GroundOverlay>', /Invalid KML/],
   ['no GroundOverlay', '<kml xmlns="http://www.opengis.net/kml/2.2"><Document/></kml>', /No GroundOverlay/],

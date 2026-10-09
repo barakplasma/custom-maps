@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { GeoToImageConverter } from '../core/GeoToImageConverter';
+import { GeoToImageConverter, fromMercator, toMercator } from '../core/GeoToImageConverter';
 import type { GroundOverlay, LatLonBox } from '../core/GroundOverlay';
 import type { Tiepoint } from '../core/Tiepoint';
 
@@ -21,14 +21,7 @@ export async function readKmz(blob: Blob): Promise<GroundOverlay> {
 
   // If no tiepoints, synthesize from LatLonBox: 3 corners, so the image stretches to fill the box
   // (2 would only allow a uniform scale and distort any image whose shape differs from the box's).
-  // shortcut: ignores <rotation>, upgrade when a rotated plain-KML overlay turns up
-  if (tiepoints.length === 0 && latLonBox) {
-    tiepoints.push(
-      { xPixel: 0,          yPixel: 0,           lon: latLonBox.west, lat: latLonBox.north },
-      { xPixel: imageWidth, yPixel: imageHeight,  lon: latLonBox.east, lat: latLonBox.south },
-      { xPixel: imageWidth, yPixel: 0,           lon: latLonBox.east, lat: latLonBox.north },
-    );
-  }
+  if (tiepoints.length === 0 && latLonBox) tiepoints.push(...latLonBoxCorners(latLonBox, imageWidth, imageHeight));
 
   if (tiepoints.length < 2) throw new Error('Not enough tiepoints to georeference this map');
 
@@ -144,4 +137,19 @@ function getImageDimensions(blob: Blob): Promise<{ width: number; height: number
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not decode image')); };
     img.src = url;
   });
+}
+
+// KML <rotation> turns the box counter-clockwise about its centre. Rotate in Web Mercator (y down),
+// which keeps angles, so the turn on the map is exactly the one the file asks for.
+function latLonBoxCorners(box: LatLonBox, width: number, height: number): Tiepoint[] {
+  const [west, north] = toMercator(box.north, box.west);
+  const [east, south] = toMercator(box.south, box.east);
+  const cx = (west + east) / 2, cy = (north + south) / 2;
+  const cos = Math.cos((box.rotation * Math.PI) / 180), sin = Math.sin((box.rotation * Math.PI) / 180);
+  const corner = (x: number, y: number, xPixel: number, yPixel: number): Tiepoint => {
+    const dx = x - cx, dy = y - cy;
+    const [lat, lon] = fromMercator(cx + dx * cos + dy * sin, cy - dx * sin + dy * cos);
+    return { xPixel, yPixel, lat, lon };
+  };
+  return [corner(west, north, 0, 0), corner(east, south, width, height), corner(east, north, width, 0)];
 }
