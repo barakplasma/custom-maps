@@ -1,4 +1,3 @@
-/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -62,8 +61,4 @@ export default defineConfig({
       },
     }),
   ],
-  test: {
-    include: ['src/**/*.test.ts', 'api/**/*.test.ts'],
-    environment: 'node',
-  },
 });

@@ -19,11 +19,14 @@ export async function readKmz(blob: Blob): Promise<GroundOverlay> {
   // Decode image dimensions
   const { width: imageWidth, height: imageHeight } = await getImageDimensions(imageBlob);
 
-  // If no tiepoints, synthesize from LatLonBox
+  // If no tiepoints, synthesize from LatLonBox: 3 corners, so the image stretches to fill the box
+  // (2 would only allow a uniform scale and distort any image whose shape differs from the box's).
+  // shortcut: ignores <rotation>, upgrade when a rotated plain-KML overlay turns up
   if (tiepoints.length === 0 && latLonBox) {
     tiepoints.push(
       { xPixel: 0,          yPixel: 0,           lon: latLonBox.west, lat: latLonBox.north },
       { xPixel: imageWidth, yPixel: imageHeight,  lon: latLonBox.east, lat: latLonBox.south },
+      { xPixel: imageWidth, yPixel: 0,           lon: latLonBox.east, lat: latLonBox.north },
     );
   }
 
@@ -43,7 +46,7 @@ export interface ParsedKml {
   latLonBox?: LatLonBox;
 }
 
-// Pure KML parsing (no ZIP, no image decoding) so it can be unit tested.
+// Pure KML parsing (no ZIP, no image decoding).
 export function parseKml(kmlText: string): ParsedKml {
   const dom = new DOMParser().parseFromString(kmlText, 'application/xml');
 

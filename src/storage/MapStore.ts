@@ -9,17 +9,14 @@ export interface MapRecord {
 
 // Stored shape: the KMZ as raw bytes. Safari refuses Blob values in IndexedDB in private
 // browsing ("Error preparing Blob/File data"), while ArrayBuffers work everywhere.
-// Records saved by older versions hold a Blob; both are read.
 interface StoredRecord extends Omit<MapRecord, 'kmzBlob'> {
-  kmz: ArrayBuffer | Blob;
+  kmz: ArrayBuffer;
 }
 
 const KMZ_TYPE = 'application/vnd.google-earth.kmz';
 
-export function fromStored(r: StoredRecord & { kmzBlob?: Blob }): MapRecord {
-  const { kmz, kmzBlob, ...rest } = r;
-  const data = kmz ?? kmzBlob!;
-  return { ...rest, kmzBlob: data instanceof Blob ? data : new Blob([data], { type: KMZ_TYPE }) };
+function fromStored({ kmz, ...rest }: StoredRecord): MapRecord {
+  return { ...rest, kmzBlob: new Blob([kmz], { type: KMZ_TYPE }) };
 }
 
 const DB_NAME = 'custom-maps';

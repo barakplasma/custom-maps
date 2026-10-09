@@ -23,14 +23,14 @@ custom-maps/                 ← Vite + TypeScript app at the repo root
 │   ├── storage/             ← IndexedDB + localStorage wrappers
 │   └── styles.css           ← app-level CSS on Web Awesome tokens
 ├── api/upload.ts            ← the one Vercel Function: upload tokens + free-tier quota for short links
-├── e2e/                     ← Playwright smoke tests
+├── e2e/                     ← Playwright tests (the only tests)
 ├── public/
 │   └── EGM96Geoid1deg.dac   ← geoid grid asset (~130 KB)
 ├── index.html
 ├── vercel.json
 ├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
 ├── docs/wiki/               ← explainers for the owner (map rotation, compass, testing)
-├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
+├── .github/workflows/ci.yml ← typecheck + e2e on every PR
 ├── .claude/                 ← SessionStart hook (installs deps), ponytail plugin, skills/
 ├── PRD.md
 └── CLAUDE.md
@@ -48,16 +48,16 @@ All commands run from the repo root:
 ```sh
 npm run dev          # dev server on :5173
 npm run typecheck    # tsc --noEmit
-npm test             # existing Vitest unit tests: src/**/*.test.ts (don't add new ones)
 npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 10, 360 px) + iPhone Safari (WebKit, iPhone SE 375 px)
-npm run check        # everything — must pass before pushing
+npm run check        # typecheck + e2e — must pass before pushing
 ```
 
 Workflow for changes:
 
-1. **No new unit tests** (owner's rule). Verify behaviour with e2e specs and screenshots. The
-   existing `src/**/*.test.ts` stay and must keep passing; when you edit one, files touching
-   `DOMParser` use `// @vitest-environment jsdom` (not happy-dom — it rejects CDATA, which Android KMLs use).
+1. **No unit tests** (owner's rule). Test behaviour the way a user meets it, with e2e specs and
+   screenshots — e.g. georeferencing math is checked by where the GPS dot lands on the image
+   (`e2e/georeference.spec.ts`). The one exception is `e2e/upload-quota.spec.ts`: the quota runs in
+   the Vercel Function, which `vite preview` doesn't serve, so Playwright checks the rule directly.
 2. **Every change gets an e2e spec**: add or extend one in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
@@ -332,10 +332,16 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - Do not store binary data in localStorage.
 - Call `watchPosition`, `getCurrentPosition` and `requestPermission` only in response to a user
   gesture — or after `geolocationAlreadyGranted()` confirms no prompt will appear.
+- No backwards compatibility with older versions of this web app: saved data formats (IndexedDB,
+  localStorage) may change freely, with no migration code. Compatibility with the **Android app's**
+  KMZ files is required, both ways.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
-  `docs/KMZ_FORMAT.md` exactly (the Android-format fixture in `src/io/Kml.test.ts` guards it).
+  `docs/KMZ_FORMAT.md` exactly (`e2e/kmz.spec.ts` and the export test in `e2e/editor.spec.ts` guard it).
 - No external requests except OSM tile servers and shared maps (Vercel Blob: `MAPS_URL`, and
   uploads via `vercel.com/api/blob`). Vercel Web Analytics / Speed Insights are same-origin and
   only injected in Vercel builds (`src/main.ts`).
+- `e2e/recreate.spec.ts` rebuilds one of the owner's real maps (`e2e/fixtures/beit-berl.kmz`) from
+  scratch through the wizard. If the wizard changes, update the test's tapping helpers — never the
+  fixture: every version of the app must still be able to make that map.
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
-- Every change ships with an e2e test (no new unit tests) and `npm run check` passing.
+- Every change ships with an e2e test (no unit tests) and `npm run check` passing.
