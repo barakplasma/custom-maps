@@ -340,5 +340,8 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - No external requests except OSM tile servers and shared maps (Vercel Blob: `MAPS_URL`, and
   uploads via `vercel.com/api/blob`). Vercel Web Analytics / Speed Insights are same-origin and
   only injected in Vercel builds (`src/main.ts`).
+- `e2e/recreate.spec.ts` rebuilds one of the owner's real maps (`e2e/fixtures/beit-berl.kmz`) from
+  scratch through the wizard. If the wizard changes, update the test's tapping helpers — never the
+  fixture: every version of the app must still be able to make that map.
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
 - Every change ships with an e2e test (no unit tests) and `npm run check` passing.
