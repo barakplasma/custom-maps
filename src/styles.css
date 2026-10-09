@@ -74,6 +74,8 @@ wa-button > wa-icon { pointer-events: none; }
   color: var(--wa-color-text-quiet);
 }
 .leaflet-control-attribution a { color: var(--wa-color-text-link); }
+/* leaflet-rotate draws its north arrow as a dark inline SVG, invisible on the dark button */
+.wa-dark .leaflet-control-rotate-arrow { filter: invert(1); }
 .leaflet-control > wa-button { box-shadow: var(--wa-shadow-m); border-radius: var(--wa-border-radius-pill); }
 
 /* Dark mode: OSM only serves light tiles, so invert them into a dark basemap.

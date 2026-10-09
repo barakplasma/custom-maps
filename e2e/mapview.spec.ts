@@ -73,6 +73,31 @@ test('the map image stays attached to the map while panning', async ({ page }) =
   }, { timeout: 8000 }).toEqual({ mapMoved: true, imageFollowed: true });
 });
 
+test('the map can be turned to face the way the user faces (south up here)', async ({ page, browserName }) => {
+  const ios = browserName === 'webkit';
+  await page.addInitScript(() => {
+    (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission =
+      () => Promise.resolve('granted');
+  });
+  await openRotatedMap(page);
+  const rotateButton = page.getByTitle('Rotate map');
+  await rotateButton.click(); // free rotation → follow compass
+  // Phone pointing south: the map turns 180° so south is at the top of the screen
+  const bearing = () => page.locator('.leaflet-rotate-pane').evaluate((el) => {
+    const m = new DOMMatrix(getComputedStyle(el).transform);
+    return Math.round((Math.atan2(m.b, m.a) * 180) / Math.PI);
+  });
+  await expect(async () => {
+    // Android Chrome: absolute alpha via deviceorientationabsolute. iOS: webkitCompassHeading.
+    await page.evaluate((isIos) => window.dispatchEvent(isIos
+      ? Object.assign(new Event('deviceorientation'), { alpha: 0, webkitCompassHeading: 180, webkitCompassAccuracy: 10 })
+      : Object.assign(new Event('deviceorientationabsolute'), { alpha: 180, beta: 0, gamma: 0, absolute: true })), ios);
+    expect(Math.abs(await bearing())).toBe(180);
+  }).toPass();
+  await rotateButton.click(); // → back to north up
+  expect(await bearing()).toBe(0);
+});
+
 test.describe('navigating with a map', () => {
   const HERE = { latitude: 32.08, longitude: 34.785 };
   test.use({ geolocation: HERE, permissions: ['geolocation'] });

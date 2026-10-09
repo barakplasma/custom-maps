@@ -29,8 +29,9 @@ custom-maps/                 ← Vite + TypeScript app at the repo root
 ├── index.html
 ├── vercel.json
 ├── docs/KMZ_FORMAT.md       ← KMZ schema + Android compatibility rules
+├── docs/wiki/               ← explainers for the owner (map rotation, compass, testing)
 ├── .github/workflows/ci.yml ← typecheck, unit, e2e on every PR
-├── .claude/                 ← SessionStart hook (installs deps) + ponytail plugin
+├── .claude/                 ← SessionStart hook (installs deps), ponytail plugin, skills/
 ├── PRD.md
 └── CLAUDE.md
 ```
@@ -47,24 +48,23 @@ All commands run from the repo root:
 ```sh
 npm run dev          # dev server on :5173
 npm run typecheck    # tsc --noEmit
-npm test             # Vitest unit tests: src/**/*.test.ts (fast, run often)
+npm test             # existing Vitest unit tests: src/**/*.test.ts (don't add new ones)
 npm run test:e2e     # Playwright: builds, serves on :4173; Android Chrome (Pixel 10, 360 px) + iPhone Safari (WebKit, iPhone SE 375 px)
 npm run check        # everything — must pass before pushing
 ```
 
 Workflow for changes:
 
-1. **Pure logic** (`core/`, KML parsing/building in `io/`): write or extend a `*.test.ts` next to
-   the file. `core/` tests run in Node; files touching `DOMParser` use
-   `// @vitest-environment jsdom` (not happy-dom — it rejects CDATA, which Android KMLs use).
-2. **UI changes**: add or extend a spec in `e2e/`. Tests must be hermetic — stub
+1. **No new unit tests** (owner's rule). Verify behaviour with e2e specs and screenshots. The
+   existing `src/**/*.test.ts` stay and must keep passing; when you edit one, files touching
+   `DOMParser` use `// @vitest-environment jsdom` (not happy-dom — it rejects CDATA, which Android KMLs use).
+2. **Every change gets an e2e spec**: add or extend one in `e2e/`. Tests must be hermetic — stub
    `tile.openstreetmap.org` with `page.route` (see `stubTiles` in `e2e/smoke.spec.ts`).
 3. **Seeing the UI**: take a screenshot with Playwright (`await page.screenshot({ path })`) at
    the Pixel 10 profile (`devices['Pixel 10']`, 360×732) and look at it, rather than guessing from the DOM — in **both** color schemes
    (`browser.newContext({ colorScheme: 'dark' })`). Leaflet `flyTo` animations can take several
    seconds; wait before judging map screenshots.
-4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`)
-   so they can be unit tested without a browser.
+4. Keep logic out of `ui/` where possible — extract pure functions (like `parseKml`/`buildKml`).
 
 In Claude Code on the web, the SessionStart hook runs `npm install` and sets
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to the preinstalled Chromium, so the commands above work
@@ -204,7 +204,7 @@ const watchId = navigator.geolocation.watchPosition(
 ```
 
 **Compass**: listen to `deviceorientationabsolute`, fall back to `deviceorientation`.
-`event.alpha` is degrees CW from North.
+`event.alpha` grows **counter-clockwise**, so compass heading = `360 − alpha`; iOS gives `webkitCompassHeading` (already CW). See `docs/wiki/compass-on-phones.md`.
 
 **iOS Safari 13+ compass permission** — must be called from a user-gesture handler:
 
@@ -239,7 +239,8 @@ src/location/
   permissions.ts           — geolocationAlreadyGranted() (no prompt on page load)
 
 src/ui/
-  MapView.ts               — main map page, Leaflet map + canvas image overlay
+  MapView.ts               — main map page, Leaflet map + canvas image overlay; rotates
+                             (leaflet-rotate: two-finger twist, button: free → follow compass → north up)
   ScaleBar.ts              — scale display, updates on zoom                  (planned)
   DetailsPanel.ts          — lat/lon/alt/heading/speed/accuracy panel        (planned)
   MapLibrary.ts            — IndexedDB-backed map list; ⋯ menu: share link / share file / edit
@@ -337,4 +338,4 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
   uploads via `vercel.com/api/blob`). Vercel Web Analytics / Speed Insights are same-origin and
   only injected in Vercel builds (`src/main.ts`).
 - When unsure about the KMZ schema or feature behaviour, read `docs/KMZ_FORMAT.md` and `PRD.md`.
-- Every change ships with a test (unit or e2e) and `npm run check` passing.
+- Every change ships with an e2e test (no new unit tests) and `npm run check` passing.

@@ -5,3 +5,5 @@
 declare const __APP_URL__: string;
 // Base URL of shared .kmz files ('' when link sharing isn't set up), see vite.config.ts
 declare const __MAPS_URL__: string;
+// leaflet-rotate ships no types; its additions are declared in src/leaflet-rotate.d.ts
+declare module 'leaflet-rotate';
