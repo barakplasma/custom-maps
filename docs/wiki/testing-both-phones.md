@@ -32,3 +32,17 @@ flowchart LR
 
 A throwaway screenshot spec (delete it before committing) is the quickest way: open the map,
 `page.screenshot({ path })`, then `browser.newContext({ colorScheme: 'dark' })` for the second.
+
+## No unit tests — so how is the math tested?
+
+The project has only Playwright tests. Pure logic is checked through what a user would notice:
+
+| Logic | Checked by |
+|---|---|
+| Tiepoint fit (`GeoToImageConverter`, `DMatrix`) | `georeference.spec.ts`: stand at a spot, the GPS dot must land on the image pixel showing it |
+| KML read/write | `kmz.spec.ts` opens Android and plain-KML files; `editor.spec.ts` exports a map and reads it back |
+| Saved data (`MapStore`, `Prefs`) | `storage.spec.ts`: old record formats, corrupt or blocked storage, unreadable files |
+| Upload quota (`api/upload.ts`) | `upload-quota.spec.ts` checks the rule directly — the Vercel Function isn't served in tests |
+
+A test is only worth having if it fails when the code breaks. When adding one, break the code on
+purpose (e.g. swap lat/lon in `KmzWriter.ts`) and watch it go red before trusting it.

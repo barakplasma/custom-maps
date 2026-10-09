@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installs app dependencies so `npm test` / `npm run test:e2e` work immediately
+# Installs app dependencies so `npm run check` / `npm run test:e2e` work immediately
 # in Claude Code on the web, and points Playwright at the preinstalled Chromium.
 set -euo pipefail
 

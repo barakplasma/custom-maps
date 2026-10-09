@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import JSZip from 'jszip';
 
 // 2×2 PNG: enough to act as the map image and as stub map tiles.
 const PNG = Buffer.from(
@@ -172,7 +173,8 @@ test.describe('saving a map', () => {
   test('a blank name gets a short random one', async ({ page }) => {
     await recordTiles(page);
     await createMap(page, '');
-    await expect(page.locator('.map-list wa-button.open')).toHaveText(/^\s*Map [a-z0-9]{4}\s*$/);
+    // 4 characters with no look-alikes (no i, l, o, 0, 1)
+    await expect(page.locator('.map-list wa-button.open')).toHaveText(/^\s*Map [a-hj-km-np-z2-9]{4}\s*$/);
   });
 
   test('a typed name is kept, including non-Latin letters', async ({ page }) => {
@@ -180,6 +182,47 @@ test.describe('saving a map', () => {
     await createMap(page, 'בית ברל 2');
     await expect(page.getByRole('button', { name: 'בית ברל 2', exact: true })).toBeVisible();
   });
+});
+
+test('a saved map exports Android-format tiepoints and re-imports with its name intact', async ({ page }) => {
+  // Capture the .kmz that reaches the share sheet
+  await page.addInitScript(() => {
+    navigator.canShare = () => true;
+    navigator.share = async (data) => {
+      const bytes = new Uint8Array(await data!.files![0].arrayBuffer());
+      (window as unknown as { kmz: number[] }).kmz = [...bytes];
+    };
+  });
+  await recordTiles(page);
+  // Tap on Paris (lon ≈ 2.29, lat ≈ 48.86) so the written coordinates are recognisable
+  await page.addInitScript((v) => localStorage.setItem('cm.editorView', JSON.stringify(v)), SAVED);
+  const name = 'Trail <A> & "B"';
+  await createMap(page, name);
+  const overlay = page.locator('.leaflet-overlay-pane img');
+  await page.getByRole('button', { name, exact: true }).click();
+  await expect(overlay).toBeVisible();
+  const placed = await overlay.getAttribute('style');
+  await page.getByRole('button', { name: 'Back to maps' }).click();
+  await page.getByRole('button', { name: `More actions for ${name}` }).click();
+  await page.getByRole('menuitem', { name: 'Share file' }).click();
+  await expect.poll(() => page.evaluate(() => 'kmz' in window)).toBe(true);
+  const kmz = Buffer.from(await page.evaluate(() => (window as unknown as { kmz: number[] }).kmz));
+
+  // The schema the Android app reads (docs/KMZ_FORMAT.md): image before geo, geo as lon,lat
+  const kml = await (await JSZip.loadAsync(kmz)).file('doc.kml')!.async('string');
+  expect(kml).toContain('<ExtendedData xmlns:tie="urn:tiepoints">');
+  const tiepoints = [...kml.matchAll(/<tie:tiepoint>\s*<tie:image>[\d.]+,[\d.]+<\/tie:image>\s*<tie:geo>(2\.\d+),(48\.\d+)<\/tie:geo>/g)];
+  expect(tiepoints).toHaveLength(2);
+
+  // Delete it, then open the exported file: same name, same place
+  await page.getByRole('button', { name: `More actions for ${name}` }).click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.locator('wa-dialog[label="Delete map?"]').getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.locator('#cm-file-input').setInputFiles({ name: 'export.kmz', mimeType: 'application/vnd.google-earth.kmz', buffer: kmz });
+  await expect(overlay).toBeVisible();
+  expect(await overlay.getAttribute('style')).toBe(placed);
+  await page.getByRole('button', { name: 'Back to maps' }).click();
+  await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
 });
 
 test('editing a map re-places its tiepoints and keeps its name', async ({ page }) => {

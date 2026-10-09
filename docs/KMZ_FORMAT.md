@@ -76,5 +76,5 @@ Instead of `<LatLonBox>` the Android app could write
 | Always **write** tiepoints; always **read** tiepoints *and* `LatLonBox` | Tiepoints are exact; `LatLonBox` is for Google Earth and other KML readers |
 
 The web implementation lives in `src/io/KmzWriter.ts` (`buildKml`) and
-`src/io/KmzReader.ts` (`parseKml`). `src/io/Kml.test.ts` contains an Android-format
-fixture — keep it passing.
+`src/io/KmzReader.ts` (`parseKml`). `e2e/kmz.spec.ts` opens an Android-format fixture and
+`e2e/editor.spec.ts` checks what the app writes — keep both passing.

@@ -43,7 +43,7 @@ export interface ParsedKml {
   latLonBox?: LatLonBox;
 }
 
-// Pure KML parsing (no ZIP, no image decoding) so it can be unit tested.
+// Pure KML parsing (no ZIP, no image decoding).
 export function parseKml(kmlText: string): ParsedKml {
   const dom = new DOMParser().parseFromString(kmlText, 'application/xml');
 

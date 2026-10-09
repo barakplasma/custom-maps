@@ -31,9 +31,8 @@ npm run dev          # http://localhost:5173
 | Command | What it does |
 |---|---|
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest unit tests (`src/**/*.test.ts`) |
 | `npm run test:e2e` | Playwright smoke tests against the production build at 375 px width |
-| `npm run check` | All of the above plus `npm run build` — run before pushing |
+| `npm run check` | All of the above — run before pushing |
 
 First time running e2e tests outside Claude Code on the web: `npx playwright install chromium`.
 The iPhone (WebKit) project runs in CI; locally use `npx playwright install webkit` and `PW_WEBKIT=1`.
