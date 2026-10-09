@@ -62,12 +62,17 @@ test('opens a map made by the Android app', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Old City', exact: true })).toBeVisible();
 });
 
-test('opens a standard KML overlay that has only a LatLonBox, no tiepoints', async ({ page }) => {
+test('a standard KML overlay with only a LatLonBox is stretched to fill the box', async ({ page }) => {
+  // A square image in a 0.1° × 0.1° box at lat 32, which the map draws taller than wide
   await importKmz(page, await kmz(`<kml xmlns="http://www.opengis.net/kml/2.2"><GroundOverlay>
     <name>Box</name><Icon><href>map.png</href></Icon>
     <LatLonBox><north>32.1</north><south>32.0</south><east>34.8</east><west>34.7</west></LatLonBox>
   </GroundOverlay></kml>`));
-  await expect(page.locator('.leaflet-overlay-pane img')).toBeVisible();
+  const img = page.locator('.leaflet-overlay-pane img');
+  await expect(img).toBeVisible();
+  const box = (await img.boundingBox())!;
+  // Web Mercator stretches latitude by 1 / cos(lat): ≈ 1.18 here, where a square would be 1
+  expect(box.height / box.width).toBeCloseTo(1 / Math.cos((32.05 * Math.PI) / 180), 1);
   await page.getByRole('button', { name: 'Back to maps' }).click();
   await expect(page.getByRole('button', { name: 'Box', exact: true })).toBeVisible();
 });
