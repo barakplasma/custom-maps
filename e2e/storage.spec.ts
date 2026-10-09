@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import JSZip from 'jszip';
 
-// Saved data the app didn't write this session: old formats, garbage, storage that refuses access,
-// and files that can no longer be read.
+// Saved data the app can't trust: garbage, storage that refuses access, and files that can no
+// longer be read.
 const KMZ_TYPE = 'application/vnd.google-earth.kmz';
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==',
@@ -23,30 +23,6 @@ async function kmz(): Promise<Buffer> {
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', (r) => r.fulfill({ contentType: 'image/png', body: PNG }));
-});
-
-test('maps saved by older versions (stored as a Blob) still open', async ({ page, browserName }) => {
-  test.skip(browserName === 'webkit', "Playwright's WebKit refuses Blobs in IndexedDB (as Safari private mode does), so it can't seed an old record");
-  await page.goto('/');
-  // Older versions stored { kmzBlob: Blob }; current ones store { kmz: ArrayBuffer }
-  await page.evaluate(async (bytes) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const req = indexedDB.open('custom-maps', 1);
-      req.onupgradeneeded = () => req.result.createObjectStore('maps', { keyPath: 'id' });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    const tx = db.transaction('maps', 'readwrite');
-    tx.objectStore('maps').put({
-      id: 'legacy', name: 'Old Trail', createdAt: 1,
-      kmzBlob: new Blob([new Uint8Array(bytes)], { type: 'application/vnd.google-earth.kmz' }),
-    });
-    await new Promise((resolve) => { tx.oncomplete = resolve; });
-    db.close();
-  }, [...await kmz()]);
-  await page.reload();
-  await page.getByRole('button', { name: 'Old Trail', exact: true }).click();
-  await expect(page.locator('.leaflet-overlay-pane img')).toBeVisible();
 });
 
 for (const [label, saved] of [

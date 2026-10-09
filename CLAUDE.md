@@ -332,6 +332,9 @@ APIs) and `.../skills/webawesome-design/` (layout, theming). Read the component'
 - Do not store binary data in localStorage.
 - Call `watchPosition`, `getCurrentPosition` and `requestPermission` only in response to a user
   gesture — or after `geolocationAlreadyGranted()` confirms no prompt will appear.
+- No backwards compatibility with older versions of this web app: saved data formats (IndexedDB,
+  localStorage) may change freely, with no migration code. Compatibility with the **Android app's**
+  KMZ files is required, both ways.
 - The KMZ files the web app writes must also open in the Android app — preserve the schema in
   `docs/KMZ_FORMAT.md` exactly (`e2e/kmz.spec.ts` and the export test in `e2e/editor.spec.ts` guard it).
 - No external requests except OSM tile servers and shared maps (Vercel Blob: `MAPS_URL`, and
